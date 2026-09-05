@@ -1,0 +1,6 @@
+{
+  "name": "SignalLens AI - Automated RF Signal Intercept & Analysis",
+  "description": "Military-grade RF signal intercept, automated modulation detection, multi-domain spectrum visualization, DSP pipeline decoding, and bitstream analysis platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
