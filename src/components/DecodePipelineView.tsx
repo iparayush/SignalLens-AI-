@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { SignalProfile, DeinterleaverType, FecType } from '../types';
 import { Cpu, CheckCircle2, Sliders, Play, RotateCcw, ShieldCheck, Grid, Zap, Layers, RefreshCw } from 'lucide-react';
+import { deinterleave } from '../lib/dsp/deinterleaver';
+import { fecDecode } from '../lib/dsp/fec';
 
 interface DecodePipelineViewProps {
   activeSignal: SignalProfile;
@@ -21,20 +23,30 @@ export const DecodePipelineView: React.FC<DecodePipelineViewProps> = ({ activeSi
   const [isDecoding, setIsDecoding] = useState<boolean>(false);
   const [decodeSuccess, setDecodeSuccess] = useState<string | null>(null);
 
-  // Simulation of error correction stats
-  const [errorsCorrected, setErrorsCorrected] = useState<number>(14);
-  const [codingGainDb, setCodingGainDb] = useState<number>(5.4);
+  // Real or initial error correction stats
+  const [errorsCorrected, setErrorsCorrected] = useState<number>(
+    activeSignal.fecResult ? activeSignal.fecResult.errorsCorrected : 14
+  );
+  const [codingGainDb, setCodingGainDb] = useState<number>(
+    activeSignal.fecResult ? activeSignal.fecResult.codingGainDb : 5.4
+  );
 
   const handleRunPipeline = () => {
     setIsDecoding(true);
     setTimeout(() => {
+      const inputBytes = activeSignal.demodulationResult?.bits || new Uint8Array(activeSignal.rawSampleBytes);
+      const deinterleaved = deinterleave(inputBytes, deinterleaverType, matrixRows, matrixCols);
+      const fec = fecDecode(deinterleaved.data, fecType, viterbiRate);
+
       setIsDecoding(false);
-      setErrorsCorrected((prev) => prev + Math.floor(Math.random() * 4) + 1);
+      setErrorsCorrected(fec.errorsCorrected);
+      setCodingGainDb(fec.codingGainDb);
+      const throughputMBs = ((deinterleaved.data.length / Math.max(1, fec.processingTimeMs)) * 1000) / (1024 * 1024);
       setDecodeSuccess(
-        `Pipeline Executed: De-interleaver dispersed 8-bit burst. ${fecType.toUpperCase()} corrected all parity syndromes (BER: 0.00e-0).`
+        `Pipeline Executed: ${deinterleaved.params} in ${deinterleaved.processingTimeMs.toFixed(1)} ms. ${fec.config} corrected ${fec.errorsCorrected} bit errors (${throughputMBs.toFixed(1)} MB/s).`
       );
-      setTimeout(() => setDecodeSuccess(null), 4000);
-    }, 900);
+      setTimeout(() => setDecodeSuccess(null), 5000);
+    }, 400);
   };
 
   return (

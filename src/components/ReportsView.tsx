@@ -1,6 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SignalProfile } from '../types';
-import { FileText, Download, ShieldAlert, MapPin, Radio, Target, CheckCircle2 } from 'lucide-react';
+import {
+  FileText,
+  Download,
+  ShieldAlert,
+  MapPin,
+  Radio,
+  Target,
+  CheckCircle2,
+  Printer,
+  FileCode,
+  Layers,
+} from 'lucide-react';
+import { generateSignalReportPdf, openPrintableReport } from '../lib/pdfGenerator';
 
 interface ReportsViewProps {
   activeSignal: SignalProfile;
@@ -8,6 +20,54 @@ interface ReportsViewProps {
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenExportModal }) => {
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+
+  const handleDownloadDirect = (format: 'pdf' | 'json' | 'csv') => {
+    const baseName = activeSignal.filename.replace(/\.[^/.]+$/, '');
+    const filename = `${baseName}_SIGINT_REPORT.${format}`;
+    let blob: Blob;
+
+    if (format === 'pdf') {
+      blob = generateSignalReportPdf(activeSignal);
+    } else if (format === 'json') {
+      const jsonContent = JSON.stringify(
+        {
+          reportClassification: 'TOP SECRET // NTRO-SIGINT-2026',
+          timestamp: new Date().toISOString(),
+          isComputed: activeSignal.isComputed || false,
+          processingTimeMs: activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs,
+          emitter: activeSignal.emitterProfile,
+          telemetry: activeSignal.telemetry,
+          correlation: activeSignal.correlation,
+          pipelineStages: activeSignal.pipelineStages,
+          recoveredBytesCount: activeSignal.rawSampleBytes.length,
+        },
+        null,
+        2
+      );
+      blob = new Blob([jsonContent], { type: 'application/json' });
+    } else {
+      const csvContent =
+        `Offset,HexBytes,Ascii\n` +
+        activeSignal.bitstreamLines
+          .map((l) => `"${l.offset}","${l.hexBytes.join(' ')}","${l.ascii.replace(/"/g, '""')}"`)
+          .join('\n');
+      blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setDownloadNotice(`Generated and downloaded ${filename} successfully.`);
+    setTimeout(() => setDownloadNotice(null), 3500);
+  };
+
   return (
     <div className="flex flex-col w-full gap-5">
       {/* Header */}
@@ -20,18 +80,64 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
             </h1>
           </div>
           <p className="font-mono text-xs text-[#869397] mt-1">
-            Automated intelligence summary ready for command chain distribution.
+            Automated intelligence summary ready for command chain distribution and export.
           </p>
         </div>
 
-        <button
-          onClick={onOpenExportModal}
-          className="flex items-center gap-2 px-4 py-2 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(6,182,212,0.4)]"
-        >
-          <Download className="w-4 h-4" />
-          <span>Export Mission Report</span>
-        </button>
+        {/* Quick Export Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleDownloadDirect('pdf')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+            title="Download formatted binary PDF"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>PDF</span>
+          </button>
+
+          <button
+            onClick={() => handleDownloadDirect('json')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#262a35] hover:bg-[#353944] text-[#4cd7f6] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all border border-[#313540] cursor-pointer"
+            title="Download structured JSON telemetry"
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            <span>JSON</span>
+          </button>
+
+          <button
+            onClick={() => handleDownloadDirect('csv')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#262a35] hover:bg-[#353944] text-[#adc6ff] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all border border-[#313540] cursor-pointer"
+            title="Download CSV octet buffer"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>CSV</span>
+          </button>
+
+          <button
+            onClick={() => openPrintableReport(activeSignal)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1c1f2a] hover:bg-[#262a35] text-[#4edea3] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all border border-[#4edea3]/40 cursor-pointer"
+            title="Print or Save as PDF via Browser"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print</span>
+          </button>
+
+          <button
+            onClick={onOpenExportModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#06b6d4] hover:bg-[#4cd7f6] text-[#00424f] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>More Options...</span>
+          </button>
+        </div>
       </div>
+
+      {downloadNotice && (
+        <div className="px-4 py-2.5 rounded bg-[#4edea3]/15 border border-[#4edea3]/30 text-[#4edea3] font-mono text-xs flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{downloadNotice}</span>
+        </div>
+      )}
 
       {/* Military Dossier Container */}
       <div className="bg-[#171b26] p-6 rounded border border-[#262a35] flex flex-col gap-6 shadow-xl relative overflow-hidden">
@@ -104,11 +210,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
             </div>
             <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
               <span className="text-[#869397] text-[10px] block">Baud Rate:</span>
-              <strong className="text-[#dfe2f1]">{activeSignal.telemetry.symbolRateMSym} MSym/s</strong>
+              <strong className="text-[#dfe2f1]">{activeSignal.telemetry.symbolRateMSym.toFixed(3)} MSym/s</strong>
             </div>
             <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
               <span className="text-[#869397] text-[10px] block">SNR Margin:</span>
-              <strong className="text-[#4edea3]">+{activeSignal.telemetry.estimatedSnrDb} dB</strong>
+              <strong className="text-[#4edea3]">+{activeSignal.telemetry.estimatedSnrDb.toFixed(1)} dB</strong>
             </div>
           </div>
         </div>
@@ -135,8 +241,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[#869397]">Cross-Correlation Peak Margin:</span>
-              <span className="text-[#4edea3] font-bold">+{activeSignal.correlation.crossCorrPsrDb} dB PSR (PASS)</span>
+              <span className="text-[#4edea3] font-bold">+{activeSignal.correlation.crossCorrPsrDb.toFixed(1)} dB PSR (PASS)</span>
             </div>
+          </div>
+        </div>
+
+        {/* Section 4: Recovered Bit Stream Hex & ASCII Preview */}
+        <div className="flex flex-col gap-3">
+          <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#4cd7f6] flex items-center gap-2 border-b border-[#262a35] pb-2">
+            <FileText className="w-4 h-4" />
+            4. Demodulated &amp; Error-Corrected Payload Samples
+          </h2>
+
+          <div className="bg-[#0a0e18] p-3 rounded border border-[#262a35] font-mono text-xs flex flex-col gap-1 max-h-48 overflow-y-auto">
+            {activeSignal.bitstreamLines.slice(0, 16).map((line, idx) => (
+              <div key={idx} className="flex gap-4 text-[11px]">
+                <span className="text-[#869397] select-none">{line.offset}</span>
+                <span className="text-[#4cd7f6]">{line.hexBytes.join(' ')}</span>
+                <span className="text-[#4edea3] ml-auto">{line.ascii}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

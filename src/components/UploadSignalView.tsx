@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SignalProfile } from '../types';
-import { UploadCloud, CheckCircle2, HardDrive, Cpu, Radio, Sparkles, FileText, ArrowRight } from 'lucide-react';
+import { UploadCloud, CheckCircle2, HardDrive, Cpu, Radio, Sparkles, FileText, ArrowRight, Zap } from 'lucide-react';
+import { generateTestIQFile } from '../lib/dsp/signalGenerator';
 
 interface UploadSignalViewProps {
   activeSignal: SignalProfile;
@@ -19,6 +20,7 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<SignalProfile>(activeSignal);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleApplySignal = (sig: SignalProfile) => {
     setSelectedPreset(sig);
@@ -32,6 +34,34 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
       const file = e.target.files[0];
       onFileUpload(file);
       setStatusMessage(`Ingested ${file.name}. DSP engine analyzing...`);
+      setTimeout(() => setStatusMessage(null), 3500);
+    }
+  };
+
+  const handleGenerateSignal = (mod: 'QPSK' | 'BPSK' | '16-QAM' | '2-FSK') => {
+    const file = generateTestIQFile({ modulation: mod, snrDb: 22, preamble: 'CCSDS' });
+    onFileUpload(file);
+    setStatusMessage(`Synthesized calibrated ${mod} .IQ capture (${(file.size / 1024).toFixed(1)} KB) and launched real DSP pipeline!`);
+    setTimeout(() => setStatusMessage(null), 4000);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      onFileUpload(file);
+      setStatusMessage(`Ingested ${file.name} via drag-and-drop. DSP pipeline analyzing...`);
       setTimeout(() => setStatusMessage(null), 3500);
     }
   };
@@ -78,12 +108,21 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
               Direct Binary File Ingestion
             </h2>
 
-            <label className="border-2 border-dashed border-[#313540] hover:border-[#4cd7f6] bg-[#0a0e18] hover:bg-[#1c1f2a] transition-all p-6 rounded flex flex-col items-center justify-center text-center cursor-pointer group">
+            <label
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed transition-all p-6 rounded flex flex-col items-center justify-center text-center cursor-pointer group ${
+                isDragging
+                  ? 'border-[#4cd7f6] bg-[#1c1f2a] scale-[1.01]'
+                  : 'border-[#313540] hover:border-[#4cd7f6] bg-[#0a0e18] hover:bg-[#1c1f2a]'
+              }`}
+            >
               <div className="w-12 h-12 rounded-full bg-[#262a35] flex items-center justify-center text-[#4cd7f6] mb-2 group-hover:scale-110 transition-transform">
-                <UploadCloud className="w-6 h-6" />
+                <UploadCloud className={`w-6 h-6 ${isDragging ? 'animate-bounce text-[#4edea3]' : ''}`} />
               </div>
               <span className="font-headline text-base font-semibold text-[#dfe2f1]">
-                Select or Drop Raw RF Capture
+                {isDragging ? 'Drop File to Ingest Signal' : 'Select or Drop Raw RF Capture'}
               </span>
               <span className="font-mono text-xs text-[#869397] mt-1 max-w-xs">
                 Supports .iq, .wav, .raw, .dat, .bin files with interleaved complex I/Q samples
@@ -98,6 +137,33 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
                 onChange={handleCustomFileInput}
               />
             </label>
+
+            {/* Instant Calibrated Signal Synthesizer */}
+            <div className="flex flex-col gap-2 bg-[#0a0e18] p-3.5 rounded border border-[#262a35]">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-semibold uppercase text-[#dfe2f1] flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-[#4edea3]" />
+                  Instant Test Signal Synthesizer
+                </span>
+                <span className="font-mono text-[9px] text-[#4edea3] bg-[#003824] px-1.5 py-0.5 rounded border border-[#4edea3]/30 uppercase font-bold">
+                  AUTOPILOT
+                </span>
+              </div>
+              <p className="font-mono text-[11px] text-[#869397] leading-tight">
+                Synthesize and inject a real 16-bit complex I/Q capture with CCSDS sync markers directly into the full analysis pipeline:
+              </p>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {(['QPSK', 'BPSK', '16-QAM', '2-FSK'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => handleGenerateSignal(m)}
+                    className="py-1.5 px-2 bg-[#1c1f2a] hover:bg-[#262a35] hover:border-[#4cd7f6] border border-[#313540] text-[#4cd7f6] rounded font-mono text-[11px] font-bold uppercase transition-all shadow-xs cursor-pointer text-center"
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Hardware SDR direct stream interface */}
             <div className="flex flex-col gap-2 bg-[#1c1f2a] p-3 rounded border border-[#313540]">

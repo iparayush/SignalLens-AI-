@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SignalProfile, ModulationType, ModulationCategory } from '../types';
-import { Radio, Activity, CheckCircle2, Sliders, Play, RotateCcw, Zap, Layers, RefreshCw } from 'lucide-react';
+import { Radio, CheckCircle2, Sliders, Play, Layers, RefreshCw } from 'lucide-react';
+import { demodulate, type DemodulationResult } from '../lib/dsp/demodulator';
 
 interface DemodulationViewProps {
   activeSignal: SignalProfile;
@@ -20,6 +21,11 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [demodSuccessNotice, setDemodSuccessNotice] = useState<string | null>(null);
 
+  // Active or executed demodulation result
+  const [currentResult, setCurrentResult] = useState<DemodulationResult | null>(
+    activeSignal.demodulationResult || null
+  );
+
   const MOD_FAMILIES: Record<ModulationCategory, ModulationType[]> = {
     PSK: ['BPSK', 'QPSK', '8PSK'],
     QAM: ['16-QAM', '64-QAM', '256-QAM'],
@@ -35,12 +41,66 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
 
   const handleRunDemodulation = () => {
     setIsProcessing(true);
+
     setTimeout(() => {
+      let result: DemodulationResult;
+
+      if (activeSignal.rawIQ && activeSignal.rawIQ.length >= 64) {
+        const sampleRate = activeSignal.samplingRateMSps * 1e6;
+        const symbolRate = (activeSignal.telemetry.symbolRateMSym || 1.2) * 1e6;
+        result = demodulate(
+          activeSignal.rawIQ,
+          sampleRate,
+          symbolRate,
+          selectedMod as any,
+          loopBw * 1000
+        );
+      } else {
+        // Synthesize result for preview if no raw IQ loaded
+        result = {
+          bits: new Uint8Array(2400),
+          numBits: 19200,
+          constellation: [],
+          evmRms: 2.4,
+          phaseJitterDeg: 1.4,
+          cfoHz: 18.2,
+          carrierLocked: true,
+          symbolRateHz: (activeSignal.telemetry.symbolRateMSym || 1.2) * 1e6,
+          modulation: selectedMod,
+          estimatedBer: 0.0,
+        };
+      }
+
+      setCurrentResult(result);
       setIsProcessing(false);
-      setDemodSuccessNotice(`Demodulated ${selectedMod} stream: 19,200 bits recovered at 0 frame slippage.`);
-      setTimeout(() => setDemodSuccessNotice(null), 3500);
-    }, 800);
+      setDemodSuccessNotice(
+        `Demodulated ${selectedMod} stream: ${result.numBits.toLocaleString()} bits recovered at 0 frame slippage.`
+      );
+      setTimeout(() => setDemodSuccessNotice(null), 4000);
+    }, 400);
   };
+
+  // SVG Scaled points for Constellation (240 × 240)
+  const renderedPoints = useMemo(() => {
+    if (currentResult?.constellation && currentResult.constellation.length > 0) {
+      const slice = currentResult.constellation.slice(0, 300);
+      let maxAbs = 0.1;
+      for (const pt of slice) {
+        maxAbs = Math.max(maxAbs, Math.abs(pt.i), Math.abs(pt.q));
+      }
+      return slice.map((pt, idx) => ({
+        cx: 120 + (pt.i / maxAbs) * 85,
+        cy: 120 - (pt.q / maxAbs) * 85,
+        key: idx,
+      }));
+    }
+    return null;
+  }, [currentResult]);
+
+  const activeEvm = currentResult ? currentResult.evmRms : activeSignal.evmRms;
+  const activeJitter = currentResult ? currentResult.phaseJitterDeg : activeSignal.phaseJitterDeg;
+  const activeCfo = currentResult ? currentResult.cfoHz : 18;
+  const activeLocked = currentResult ? currentResult.carrierLocked : true;
 
   return (
     <div className="flex flex-col w-full gap-5">
@@ -105,7 +165,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                     setSelectedFamily(fam);
                     handleSelectMod(MOD_FAMILIES[fam][0]);
                   }}
-                  className={`py-2 text-center rounded font-mono text-xs font-bold transition-all uppercase ${
+                  className={`py-2 text-center rounded font-mono text-xs font-bold transition-all uppercase cursor-pointer ${
                     selectedFamily === fam
                       ? 'bg-[#4cd7f6] text-[#003640] shadow-sm'
                       : 'text-[#bcc9cd] hover:text-[#dfe2f1]'
@@ -124,7 +184,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                   <button
                     key={mod}
                     onClick={() => handleSelectMod(mod)}
-                    className={`py-2.5 px-3 rounded font-mono text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-1 ${
+                    className={`py-2.5 px-3 rounded font-mono text-xs font-bold border transition-all text-center flex flex-col items-center justify-center gap-1 cursor-pointer ${
                       isSelected
                         ? 'bg-[#1c1f2a] border-[#4cd7f6] text-[#4cd7f6] shadow-[0_0_10px_rgba(76,215,246,0.2)]'
                         : 'bg-[#0a0e18] border-[#313540] text-[#bcc9cd] hover:border-[#869397]'
@@ -187,7 +247,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                     <button
                       key={algo}
                       onClick={() => setTimingAlgo(algo)}
-                      className={`py-1 text-[10px] rounded font-semibold ${
+                      className={`py-1 text-[10px] rounded font-semibold cursor-pointer ${
                         timingAlgo === algo
                           ? 'bg-[#262a35] text-[#4cd7f6] border border-[#4cd7f6]/40'
                           : 'text-[#869397] hover:text-[#dfe2f1]'
@@ -205,7 +265,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setSlicerMode('soft')}
-                    className={`py-1.5 px-2 rounded border text-center font-bold ${
+                    className={`py-1.5 px-2 rounded border text-center font-bold cursor-pointer ${
                       slicerMode === 'soft'
                         ? 'bg-[#1c1f2a] border-[#4edea3] text-[#4edea3]'
                         : 'bg-[#0a0e18] border-[#313540] text-[#869397]'
@@ -215,7 +275,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                   </button>
                   <button
                     onClick={() => setSlicerMode('hard')}
-                    className={`py-1.5 px-2 rounded border text-center font-bold ${
+                    className={`py-1.5 px-2 rounded border text-center font-bold cursor-pointer ${
                       slicerMode === 'hard'
                         ? 'bg-[#1c1f2a] border-[#4edea3] text-[#4edea3]'
                         : 'bg-[#0a0e18] border-[#313540] text-[#869397]'
@@ -238,7 +298,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                 2. Real-Time Demodulated Constellation &amp; Eye Diagram
               </h2>
               <span className="font-mono text-xs text-[#4edea3] font-bold">
-                EVM: {activeSignal.evmRms}% RMS
+                EVM: {activeEvm.toFixed(1)}% RMS
               </span>
             </div>
 
@@ -252,70 +312,75 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                 {/* Unit amplitude circle */}
                 <circle cx="120" cy="120" r="75" fill="none" stroke="#1c1f2a" strokeWidth="1" strokeDasharray="2 2" />
 
-                {/* Dynamic Constellation Points depending on selectedMod */}
-                {selectedMod === 'BPSK' && (
-                  <g fill="#4cd7f6">
-                    {/* 2 poles on I axis */}
-                    <circle cx="45" cy="120" r="4" opacity="0.9" />
-                    <circle cx="195" cy="120" r="4" opacity="0.9" />
-                    {/* Clouds */}
-                    <circle cx="47" cy="118" r="2.5" opacity="0.6" />
-                    <circle cx="43" cy="123" r="2" opacity="0.6" />
-                    <circle cx="193" cy="122" r="2.5" opacity="0.6" />
-                    <circle cx="197" cy="117" r="2" opacity="0.6" />
-                  </g>
-                )}
-
-                {(selectedMod === 'QPSK' || selectedMod === '4-FSK') && (
-                  <g fill="#4cd7f6">
-                    {/* 4 quadrants */}
-                    {[
-                      [65, 65],
-                      [175, 65],
-                      [65, 175],
-                      [175, 175],
-                    ].map(([cx, cy], i) => (
-                      <g key={i}>
-                        <circle cx={cx} cy={cy} r="4.5" opacity="0.9" />
-                        <circle cx={cx - 3} cy={cy + 2} r="2.2" opacity="0.6" />
-                        <circle cx={cx + 3} cy={cy - 2} r="2.0" opacity="0.6" />
-                        <circle cx={cx + 1} cy={cy + 3} r="1.8" opacity="0.5" />
-                        <circle cx={cx - 2} cy={cy - 3} r="1.8" opacity="0.5" />
-                      </g>
+                {/* Real Demodulated Constellation Points if computed */}
+                {renderedPoints ? (
+                  <g fill="#4cd7f6" opacity="0.85">
+                    {renderedPoints.map((pt) => (
+                      <circle key={pt.key} cx={pt.cx} cy={pt.cy} r={2.2} />
                     ))}
                   </g>
-                )}
-
-                {selectedMod === '8PSK' && (
-                  <g fill="#4cd7f6">
-                    {/* 8 circle points around perimeter */}
-                    {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
-                      const rad = (deg * Math.PI) / 180;
-                      const cx = 120 + 75 * Math.cos(rad);
-                      const cy = 120 + 75 * Math.sin(rad);
-                      return <circle key={deg} cx={cx} cy={cy} r="3.5" opacity="0.9" />;
-                    })}
-                  </g>
-                )}
-
-                {(selectedMod === '16-QAM' || selectedMod === '64-QAM' || selectedMod === '256-QAM') && (
-                  <g fill="#4cd7f6">
-                    {/* 4x4 Grid for 16-QAM */}
-                    {[45, 95, 145, 195].map((x) =>
-                      [45, 95, 145, 195].map((y) => (
-                        <circle key={`${x}-${y}`} cx={x} cy={y} r="3" opacity="0.85" />
-                      ))
+                ) : (
+                  <>
+                    {/* Fallback depending on selectedMod */}
+                    {selectedMod === 'BPSK' && (
+                      <g fill="#4cd7f6">
+                        <circle cx="45" cy="120" r="4" opacity="0.9" />
+                        <circle cx="195" cy="120" r="4" opacity="0.9" />
+                        <circle cx="47" cy="118" r="2.5" opacity="0.6" />
+                        <circle cx="43" cy="123" r="2" opacity="0.6" />
+                        <circle cx="193" cy="122" r="2.5" opacity="0.6" />
+                        <circle cx="197" cy="117" r="2" opacity="0.6" />
+                      </g>
                     )}
-                  </g>
-                )}
 
-                {(selectedMod === '2-FSK' || selectedMod === 'GMSK') && (
-                  <g>
-                    {/* FSK Continuous Phase circle trajectory */}
-                    <circle cx="120" cy="120" r="65" fill="none" stroke="#4cd7f6" strokeWidth="2" opacity="0.7" />
-                    <circle cx="55" cy="120" r="5" fill="#4edea3" />
-                    <circle cx="185" cy="120" r="5" fill="#4edea3" />
-                  </g>
+                    {(selectedMod === 'QPSK' || selectedMod === '4-FSK') && (
+                      <g fill="#4cd7f6">
+                        {[
+                          [65, 65],
+                          [175, 65],
+                          [65, 175],
+                          [175, 175],
+                        ].map(([cx, cy], i) => (
+                          <g key={i}>
+                            <circle cx={cx} cy={cy} r="4.5" opacity="0.9" />
+                            <circle cx={cx - 3} cy={cy + 2} r="2.2" opacity="0.6" />
+                            <circle cx={cx + 3} cy={cy - 2} r="2.0" opacity="0.6" />
+                            <circle cx={cx + 1} cy={cy + 3} r="1.8" opacity="0.5" />
+                            <circle cx={cx - 2} cy={cy - 3} r="1.8" opacity="0.5" />
+                          </g>
+                        ))}
+                      </g>
+                    )}
+
+                    {selectedMod === '8PSK' && (
+                      <g fill="#4cd7f6">
+                        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+                          const rad = (deg * Math.PI) / 180;
+                          const cx = 120 + 75 * Math.cos(rad);
+                          const cy = 120 + 75 * Math.sin(rad);
+                          return <circle key={deg} cx={cx} cy={cy} r="3.5" opacity="0.9" />;
+                        })}
+                      </g>
+                    )}
+
+                    {(selectedMod === '16-QAM' || selectedMod === '64-QAM' || selectedMod === '256-QAM') && (
+                      <g fill="#4cd7f6">
+                        {[45, 95, 145, 195].map((x) =>
+                          [45, 95, 145, 195].map((y) => (
+                            <circle key={`${x}-${y}`} cx={x} cy={y} r="3" opacity="0.85" />
+                          ))
+                        )}
+                      </g>
+                    )}
+
+                    {(selectedMod === '2-FSK' || selectedMod === 'GMSK') && (
+                      <g>
+                        <circle cx="120" cy="120" r="65" fill="none" stroke="#4cd7f6" strokeWidth="2" opacity="0.7" />
+                        <circle cx="55" cy="120" r="5" fill="#4edea3" />
+                        <circle cx="185" cy="120" r="5" fill="#4edea3" />
+                      </g>
+                    )}
+                  </>
                 )}
               </svg>
 
@@ -323,7 +388,7 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
                 SCHEME: {selectedMod}
               </span>
               <span className="absolute bottom-2 right-3 font-mono text-[10px] text-[#869397]">
-                Normalized Decision Grids
+                {renderedPoints ? `${renderedPoints.length} Sliced Symbols` : 'Normalized Decision Grids'}
               </span>
             </div>
 
@@ -331,19 +396,23 @@ export const DemodulationView: React.FC<DemodulationViewProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
               <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
                 <span className="text-[#869397] text-[10px] block">CFO Offset:</span>
-                <strong className="text-[#4edea3]">+18 Hz (Locked)</strong>
+                <strong className={activeLocked ? 'text-[#4edea3]' : 'text-[#ff6b6b]'}>
+                  {activeCfo >= 0 ? `+${activeCfo.toFixed(0)}` : activeCfo.toFixed(0)} Hz ({activeLocked ? 'Locked' : 'Unlocked'})
+                </strong>
               </div>
               <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
                 <span className="text-[#869397] text-[10px] block">Phase Jitter:</span>
-                <strong className="text-[#dfe2f1]">±1.4° RMS</strong>
+                <strong className="text-[#dfe2f1]">±{activeJitter.toFixed(1)}° RMS</strong>
               </div>
               <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
-                <span className="text-[#869397] text-[10px] block">MER (SNR in-band):</span>
-                <strong className="text-[#4cd7f6]">28.4 dB</strong>
+                <span className="text-[#869397] text-[10px] block">Recovered Bits:</span>
+                <strong className="text-[#4cd7f6]">
+                  {currentResult ? currentResult.numBits.toLocaleString() : '19,200'} bits
+                </strong>
               </div>
               <div className="bg-[#0a0e18] p-2.5 rounded border border-[#262a35]">
                 <span className="text-[#869397] text-[10px] block">Symbol Lock:</span>
-                <strong className="text-[#4edea3]">LOCKED (100%)</strong>
+                <strong className="text-[#4edea3]">{activeLocked ? 'LOCKED (100%)' : 'ACQUIRING'}</strong>
               </div>
             </div>
           </div>

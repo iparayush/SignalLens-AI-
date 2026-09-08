@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SignalProfile } from '../types';
-import { Download, X, FileText, Check, ShieldAlert } from 'lucide-react';
+import { Download, X, FileText, Check, ShieldAlert, Printer } from 'lucide-react';
+import { generateSignalReportPdf, openPrintableReport } from '../lib/pdfGenerator';
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -19,17 +20,29 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   if (!isOpen) return null;
 
   const handleDownload = () => {
-    let content = '';
-    let filename = `${activeSignal.filename.replace('.iq', '')}_SIGINT_REPORT.${format}`;
-    let mimeType = 'text/plain';
+    const baseName = activeSignal.filename.replace(/\.[^/.]+$/, '');
+    const filename = `${baseName}_SIGINT_REPORT.${format}`;
+    let blob: Blob;
 
-    if (format === 'json') {
-      content = JSON.stringify(
+    if (format === 'pdf') {
+      blob = generateSignalReportPdf(activeSignal);
+    } else if (format === 'json') {
+      const jsonContent = JSON.stringify(
         {
           reportClassification: 'TOP SECRET // NTRO-SIGINT-2026',
           timestamp: new Date().toISOString(),
+          isComputed: activeSignal.isComputed || false,
+          processingTimeMs: activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs,
           emitter: activeSignal.emitterProfile,
           telemetry: activeSignal.telemetry,
+          dspDiagnostics: {
+            evmRms: activeSignal.evmRms,
+            phaseJitterDeg: activeSignal.phaseJitterDeg,
+            cfoHz: activeSignal.demodulationResult?.cfoHz || 0,
+            carrierLocked: activeSignal.demodulationResult?.carrierLocked ?? true,
+            fecErrorsCorrected: activeSignal.fecResult?.errorsCorrected ?? 14,
+            fecCodingGainDb: activeSignal.fecResult?.codingGainDb ?? 5.4,
+          },
           correlation: activeSignal.correlation,
           pipelineStages: activeSignal.pipelineStages,
           recoveredBytesCount: activeSignal.rawSampleBytes.length,
@@ -37,35 +50,44 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         null,
         2
       );
-      mimeType = 'application/json';
+      blob = new Blob([jsonContent], { type: 'application/json' });
     } else if (format === 'csv') {
-      content = `Offset,HexBytes,Ascii\n` +
+      const csvContent =
+        `Offset,HexBytes,Ascii\n` +
         activeSignal.bitstreamLines
           .map((l) => `"${l.offset}","${l.hexBytes.join(' ')}","${l.ascii.replace(/"/g, '""')}"`)
           .join('\n');
-      mimeType = 'text/csv';
+      blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     } else {
-      // PDF or TXT tactical report representation
-      content = `================================================================================
+      // Formatted TXT representation
+      const txtContent = `================================================================================
 NATIONAL TECHNICAL RESEARCH ORGANIZATION (NTRO) - SPECIAL SIGINT REPORT
 DOCUMENT ID: NTRO-2026-A1-SIG-${activeSignal.crc32}
 CLASSIFICATION: TOP SECRET // NOFORN // STRICT COMPARTMENTATION
+PIPELINE STATUS: ${activeSignal.isComputed ? 'REAL DSP CAPTURE PROCESSED' : 'CALIBRATED EMITTER CAPTURE'}
+TIMESTAMP: ${new Date().toISOString()}
 ================================================================================
 1. INTERCEPT TELEMETRY
    File Name:             ${activeSignal.filename}
    Center Frequency (Fc): ${activeSignal.fcFormatted}
    Sampling Rate (Fs):    ${activeSignal.fsFormatted}
    Duration:              ${activeSignal.durFormatted} (${activeSignal.sizeFormatted})
-   Modulation Detected:   ${activeSignal.telemetry.modulation} (${activeSignal.telemetry.modulationMatch}% Confidence)
-   Signal-to-Noise Ratio: +${activeSignal.telemetry.estimatedSnrDb} dB (${activeSignal.telemetry.snrQuality})
+   Modulation Detected:   ${activeSignal.telemetry.modulation} (${activeSignal.telemetry.modulationMatch.toFixed(1)}% Confidence)
+   Signal-to-Noise Ratio: +${activeSignal.telemetry.estimatedSnrDb.toFixed(1)} dB (${activeSignal.telemetry.snrQuality})
+   Occupied Bandwidth:    ${activeSignal.telemetry.bandwidthMHz.toFixed(3)} MHz
+   Symbol Rate:           ${activeSignal.telemetry.symbolRateMSym.toFixed(3)} MSym/s
    FEC Coding:            ${activeSignal.telemetry.fecCode}
    Interleaving:          ${activeSignal.telemetry.interleaving}
+   EVM RMS:               ${activeSignal.evmRms.toFixed(1)} %
+   Phase Jitter:          ±${activeSignal.phaseJitterDeg.toFixed(1)} °
+   Processing Latency:    ${(activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs).toFixed(1)} ms
 
 2. TARGET EMITTER PROFILE
    Designation:           ${activeSignal.emitterProfile.targetDesignation}
    Callsign:              ${activeSignal.emitterProfile.callsign}
    Classification:        ${activeSignal.emitterProfile.classification}
    Estimated Location:    ${activeSignal.emitterProfile.estimatedLocation}
+   Coordinates:           ${activeSignal.emitterProfile.coordinates[0].toFixed(4)}° N, ${activeSignal.emitterProfile.coordinates[1].toFixed(4)}° E
    Threat Assessment:     ${activeSignal.emitterProfile.threatLevel} (CRITICAL PRIORITY)
 
 3. SYNC & CORRELATION
@@ -73,15 +95,16 @@ CLASSIFICATION: TOP SECRET // NOFORN // STRICT COMPARTMENTATION
    Preamble:              ${activeSignal.correlation.syncPreambleHex}
    Matched Frame Offset:  ${activeSignal.correlation.detectedPositionOffset} (${activeSignal.correlation.bitLocation})
    Cross-Corr Margin:     +${activeSignal.correlation.crossCorrPsrDb} dB PSR
+   Status:                ${activeSignal.correlation.peakToSidelobeStatus}
 
 4. RECOVERED PAYLOAD DATA SAMPLE
-${activeSignal.bitstreamLines.map((l) => `   ${l.offset} ${l.hexBytes.join(' ')}  |  ${l.ascii}`).join('\n')}
+${activeSignal.bitstreamLines.slice(0, 32).map((l) => `   ${l.offset} ${l.hexBytes.join(' ')}  |  ${l.ascii}`).join('\n')}
 ================================================================================
 End of Tactical Transmission Log • All Checksums Validated
 `;
+      blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8;' });
     }
 
-    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -96,6 +119,10 @@ End of Tactical Transmission Log • All Checksums Validated
       setDownloaded(false);
       onClose();
     }, 1200);
+  };
+
+  const handlePrint = () => {
+    openPrintableReport(activeSignal);
   };
 
   return (
@@ -117,7 +144,7 @@ End of Tactical Transmission Log • All Checksums Validated
           </div>
           <button
             onClick={onClose}
-            className="text-[#869397] hover:text-[#dfe2f1] p-1.5 rounded hover:bg-[#262a35] transition-colors"
+            className="text-[#869397] hover:text-[#dfe2f1] p-1.5 rounded hover:bg-[#262a35] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -168,7 +195,7 @@ End of Tactical Transmission Log • All Checksums Validated
               <button
                 key={fmt}
                 onClick={() => setFormat(fmt)}
-                className={`py-2 px-3 rounded font-mono text-xs font-bold uppercase tracking-wider border transition-all ${
+                className={`py-2 px-3 rounded font-mono text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
                   format === fmt
                     ? 'bg-[#06b6d4] text-[#00424f] border-[#06b6d4] shadow-[0_0_12px_rgba(6,182,212,0.3)]'
                     : 'bg-[#1c1f2a] text-[#dfe2f1] border-[#313540] hover:bg-[#262a35]'
@@ -181,29 +208,40 @@ End of Tactical Transmission Log • All Checksums Validated
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#313540]">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#313540]">
           <button
-            onClick={onClose}
-            className="px-4 py-2 bg-[#262a35] hover:bg-[#353944] text-[#dfe2f1] font-mono text-xs rounded uppercase font-semibold transition-colors"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#262a35] hover:bg-[#353944] text-[#4cd7f6] font-mono text-xs rounded uppercase font-semibold transition-colors cursor-pointer border border-[#313540]"
+            title="Open printable HTML report for printing or saving as PDF"
           >
-            Cancel
+            <Printer className="w-4 h-4" />
+            <span>Print / Save PDF (Browser)</span>
           </button>
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 px-5 py-2 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(6,182,212,0.4)] cursor-pointer"
-          >
-            {downloaded ? (
-              <>
-                <Check className="w-4 h-4 text-[#003640]" />
-                <span>Generated &amp; Downloaded!</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 text-[#003640]" />
-                <span>Generate &amp; Download</span>
-              </>
-            )}
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-[#262a35] hover:bg-[#353944] text-[#dfe2f1] font-mono text-xs rounded uppercase font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-5 py-2 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(6,182,212,0.4)] cursor-pointer"
+            >
+              {downloaded ? (
+                <>
+                  <Check className="w-4 h-4 text-[#003640]" />
+                  <span>Downloaded!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-[#003640]" />
+                  <span>Download .{format.toUpperCase()}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

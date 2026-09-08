@@ -1,3 +1,12 @@
+import type { PipelineResults } from './lib/pipeline';
+import type { SpectrogramResult } from './lib/dsp/spectrogram';
+import type { ClassificationResult } from './lib/ml/modulationClassifier';
+import type { DemodulationResult } from './lib/dsp/demodulator';
+import type { DeinterleaveResult } from './lib/dsp/deinterleaver';
+import type { FecResult } from './lib/dsp/fec';
+import type { CorrelationResult } from './lib/dsp/correlator';
+import type { SignalMetrics } from './lib/dsp/signalMetrics';
+
 export type NavigationTab =
   | 'dashboard'
   | 'upload-signal'
@@ -27,6 +36,17 @@ export type ModulationType =
 export type DeinterleaverType = 'block' | 'convolutional' | 'diagonal' | 'pseudorandom';
 
 export type FecType = 'viterbi' | 'reedsolomon' | 'concatenated' | 'ldpc';
+
+/** Processing state for the pipeline */
+export type ProcessingState = 'idle' | 'processing' | 'complete' | 'error';
+
+/** Pipeline progress tracking */
+export interface PipelineProgressInfo {
+  stage: string;
+  stageLabel: string;
+  percent: number;
+  message: string;
+}
 
 export interface TelemetryMetrics {
   modulation: ModulationType;
@@ -119,4 +139,42 @@ export interface SignalProfile {
     threatLevel: 'Low' | 'Medium' | 'High' | 'Critical';
     targetDesignation: string;
   };
+
+  // ── Real DSP computed data (populated after pipeline runs) ──
+
+  /** Whether this profile has real computed data from the pipeline */
+  isComputed?: boolean;
+
+  /** Raw interleaved I/Q samples (Float64Array) */
+  rawIQ?: Float64Array;
+
+  /** PSD spectrum in dB */
+  psdSpectrum?: Float64Array;
+
+  /** Spectrogram data for waterfall */
+  spectrogramData?: SpectrogramResult;
+
+  /** Signal metrics from analysis */
+  signalMetrics?: SignalMetrics;
+
+  /** Modulation classification results */
+  classificationResult?: ClassificationResult;
+
+  /** Demodulation results */
+  demodulationResult?: DemodulationResult;
+
+  /** De-interleaving results */
+  deinterleaveResult?: DeinterleaveResult;
+
+  /** FEC decode results */
+  fecResult?: FecResult;
+
+  /** Correlation results */
+  correlationResult?: CorrelationResult;
+
+  /** Full pipeline results reference */
+  pipelineResults?: PipelineResults;
+
+  /** Total pipeline processing time (ms) */
+  processingTimeMs?: number;
 }

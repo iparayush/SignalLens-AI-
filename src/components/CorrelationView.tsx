@@ -1,68 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SignalProfile } from '../types';
-import { ScanLine, Search, Crosshair, CheckCircle2, Sliders, Play, FileCode, Tag, ArrowRight, Layers } from 'lucide-react';
+import { ScanLine, Search, Crosshair, CheckCircle2, Play, Layers } from 'lucide-react';
+import {
+  correlateStream,
+  KNOWN_SYNC_PATTERNS,
+  type SyncPattern,
+  type CorrelationResult,
+} from '../lib/dsp/correlator';
 
 interface CorrelationViewProps {
   activeSignal: SignalProfile;
 }
 
-interface PatternPreset {
-  id: string;
-  name: string;
-  hex: string;
-  binary: string;
-  type: 'Barker' | 'CCSDS' | 'Sync Word' | 'Custom';
-  description: string;
+function hexToBits(hex: string): number[] {
+  const clean = hex.replace(/^0x/i, '');
+  const bits: number[] = [];
+  for (const ch of clean) {
+    const nibble = parseInt(ch, 16);
+    if (!isNaN(nibble)) {
+      for (let b = 3; b >= 0; b--) {
+        bits.push((nibble >> b) & 1);
+      }
+    }
+  }
+  return bits;
 }
 
-const KNOWN_PATTERNS: PatternPreset[] = [
-  {
-    id: 'barker-13',
-    name: 'Barker 13 Sequence',
-    hex: '0x1F35',
-    binary: '1111100110101',
-    type: 'Barker',
-    description: 'Optimal aperiodic autocorrelation sidelobe level ≤ 1. Standard radar & DSSS preamble.',
-  },
-  {
-    id: 'ccsds-32',
-    name: 'CCSDS Telemetry ASM',
-    hex: '0x1ACFFC1D',
-    binary: '00011010110011111111110000011101',
-    type: 'CCSDS',
-    description: 'Consultative Committee for Space Data Systems 32-bit Attached Sync Marker.',
-  },
-  {
-    id: 'inmarsat-sync',
-    name: 'Inmarsat Aero / Frame Sync',
-    hex: '0xEB90',
-    binary: '1110101110010000',
-    type: 'Sync Word',
-    description: 'Common satellite L-band framing word with high cross-correlation threshold.',
-  },
-  {
-    id: 'barker-11',
-    name: 'Barker 11 Sequence',
-    hex: '0x0712',
-    binary: '11100010010',
-    type: 'Barker',
-    description: 'Used in 802.11 DSSS 1 & 2 Mbps PHY headers and military telemetry beacons.',
-  },
-];
-
 export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }) => {
-  const [selectedPattern, setSelectedPattern] = useState<PatternPreset>(KNOWN_PATTERNS[1]);
+  const [selectedPattern, setSelectedPattern] = useState<SyncPattern>(KNOWN_SYNC_PATTERNS[1]);
   const [customHex, setCustomHex] = useState<string>('0x1ACFFC1D');
-  const [threshold, setThreshold] = useState<number>(85);
+  const [threshold, setThreshold] = useState<number>(75);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchSuccess, setSearchSuccess] = useState<string | null>(null);
 
-  // Simulated detection hits
+  // Active correlation result state
+  const [corrResult, setCorrResult] = useState<CorrelationResult | null>(
+    activeSignal.correlationResult || null
+  );
+
+  // Fallback initial matches
   const [matches, setMatches] = useState([
     {
       offset: 0,
       bitLocation: '0x00000000',
-      lengthBytes: 4,
       psrDb: 24.8,
       confidence: 99.4,
       headerType: 'CCSDS ASM Sync Word',
@@ -70,7 +50,6 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
     {
       offset: 1024,
       bitLocation: '0x00000400',
-      lengthBytes: 4,
       psrDb: 24.5,
       confidence: 99.1,
       headerType: 'Frame 2 Sync Marker',
@@ -78,7 +57,6 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
     {
       offset: 2048,
       bitLocation: '0x00000800',
-      lengthBytes: 4,
       psrDb: 23.9,
       confidence: 98.7,
       headerType: 'Frame 3 Sync Marker',
@@ -87,12 +65,88 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
 
   const handleRunCorrelation = () => {
     setIsSearching(true);
+
     setTimeout(() => {
+      const data =
+        activeSignal.demodulationResult?.bits || new Uint8Array(activeSignal.rawSampleBytes);
+
+      const patternToUse: SyncPattern = {
+        name: selectedPattern.name,
+        hex: customHex || selectedPattern.hex,
+        bits: hexToBits(customHex || selectedPattern.hex),
+        type: selectedPattern.type,
+        description: selectedPattern.description,
+      };
+
+      const result = correlateStream(data, patternToUse, threshold / 100);
+      setCorrResult(result);
       setIsSearching(false);
-      setSearchSuccess(`Correlator found 3 sync markers for ${selectedPattern.name} with Peak-to-Sidelobe Ratio > 24 dB.`);
-      setTimeout(() => setSearchSuccess(null), 3500);
-    }, 700);
+
+      if (result.matches.length > 0) {
+        setMatches(
+          result.matches.map((m, idx) => ({
+            offset: m.bitOffset,
+            bitLocation: `0x${m.byteOffset.toString(16).padStart(8, '0').toUpperCase()}`,
+            psrDb: m.psrDb,
+            confidence: m.confidence,
+            headerType: idx === 0 ? `${m.patternName} Sync` : `Frame ${idx + 1} Marker`,
+          }))
+        );
+        setSearchSuccess(
+          `Correlator found ${result.matches.length} sync markers for ${patternToUse.name} with Peak-to-Sidelobe Ratio of ${result.bestPsrDb} dB.`
+        );
+      } else {
+        setSearchSuccess(
+          `Correlation executed: No strong peak exceeding ${threshold}% threshold found for pattern ${patternToUse.hex}. Try lowering threshold.`
+        );
+      }
+      setTimeout(() => setSearchSuccess(null), 5000);
+    }, 400);
   };
+
+  // Build SVG Path from correlationWaveform (400 × 100)
+  const { waveformPath, peakCircles } = useMemo(() => {
+    const width = 400;
+    const height = 100;
+
+    if (corrResult?.correlationWaveform && corrResult.correlationWaveform.length > 10) {
+      const wf = corrResult.correlationWaveform;
+      const numPoints = Math.min(200, wf.length);
+      const stride = wf.length / numPoints;
+      const points: string[] = [];
+      const circles: { cx: number; cy: number }[] = [];
+
+      for (let i = 0; i < numPoints; i++) {
+        const idx = Math.min(Math.floor(i * stride), wf.length - 1);
+        const x = (i / (numPoints - 1)) * width;
+        const val = wf[idx]; // 0 to 1
+        const y = 92 - val * 75;
+        points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+
+        if (val > (threshold / 100) * 0.9) {
+          circles.push({ cx: x, cy: y });
+        }
+      }
+
+      return {
+        waveformPath: `M ${points.join(' L ')}`,
+        peakCircles: circles,
+      };
+    }
+
+    // Default stylized fallback
+    return {
+      waveformPath:
+        'M0,90 Q20,88 40,91 T80,89 T120,92 T160,88 T200,90 T240,91 T280,89 T320,92 T360,88 T400,90',
+      peakCircles: [
+        { cx: 35, cy: 15 },
+        { cx: 160, cy: 15 },
+        { cx: 280, cy: 15 },
+      ],
+    };
+  }, [corrResult, threshold]);
+
+  const activePsr = corrResult ? corrResult.bestPsrDb : 24.8;
 
   return (
     <div className="flex flex-col w-full gap-5">
@@ -127,23 +181,28 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
         </div>
       )}
 
-      {/* Main Grid: Pattern Library + Peak Graph + Dissected Framing */}
+      {/* Main Grid */}
       <div className="grid grid-cols-12 gap-5">
-        {/* Left Column: Pattern Library & Threshold Tuning */}
+        {/* Left Column: Preset Selector & Pattern Config */}
         <div className="col-span-12 lg:col-span-5 flex flex-col gap-4">
           <div className="bg-[#171b26] p-5 rounded border border-[#262a35] flex flex-col gap-4">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#dfe2f1] flex items-center gap-2">
-              <Crosshair className="w-4 h-4 text-[#4cd7f6]" />
-              1. Preamble &amp; Sync Word Library
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#dfe2f1] flex items-center gap-2">
+                <Crosshair className="w-4 h-4 text-[#4cd7f6]" />
+                1. Select Preamble / Sync Pattern
+              </h2>
+              <span className="font-mono text-[10px] text-[#4cd7f6] bg-[#003640] px-2 py-0.5 rounded border border-[#4cd7f6]/40 uppercase font-bold">
+                {selectedPattern.type}
+              </span>
+            </div>
 
             {/* Presets List */}
             <div className="flex flex-col gap-2">
-              {KNOWN_PATTERNS.map((pat) => {
-                const isSelected = selectedPattern.id === pat.id;
+              {KNOWN_SYNC_PATTERNS.map((pat) => {
+                const isSelected = selectedPattern.name === pat.name;
                 return (
                   <div
-                    key={pat.id}
+                    key={pat.name}
                     onClick={() => {
                       setSelectedPattern(pat);
                       setCustomHex(pat.hex);
@@ -179,9 +238,9 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
                 />
                 <button
                   onClick={handleRunCorrelation}
-                  className="px-3 py-1.5 bg-[#262a35] hover:bg-[#353944] text-[#dfe2f1] rounded font-bold uppercase text-[11px]"
+                  className="px-3 py-1.5 bg-[#262a35] hover:bg-[#353944] text-[#dfe2f1] rounded font-bold uppercase text-[11px] cursor-pointer"
                 >
-                  Set
+                  Set &amp; Correlate
                 </button>
               </div>
             </div>
@@ -195,7 +254,7 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
               <input
                 type="range"
                 min="50"
-                max="100"
+                max="95"
                 step="5"
                 value={threshold}
                 onChange={(e) => setThreshold(parseInt(e.target.value))}
@@ -214,7 +273,7 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
                 2. Sliding Cross-Correlation Peak Output
               </h2>
               <span className="font-mono text-xs text-[#4edea3] font-bold">
-                PSR: 24.8 dB (Sharp Delta)
+                PSR: {activePsr.toFixed(1)} dB (Sharp Delta)
               </span>
             </div>
 
@@ -222,44 +281,60 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
             <div className="relative w-full h-48 bg-[#0a0e18] rounded border border-[#262a35] p-2 flex items-end">
               <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 100">
                 {/* Threshold line */}
-                <line x1="0" y1="30" x2="400" y2="30" stroke="#4edea3" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                <text x="310" y="26" fill="#4edea3" fontSize="8" fontFamily="monospace">THRESHOLD (85%)</text>
-
-                {/* Noise baseline */}
-                <path
-                  d="M0,90 Q20,88 40,91 T80,89 T120,92 T160,88 T200,90 T240,91 T280,89 T320,92 T360,88 T400,90"
-                  fill="none"
-                  stroke="#313540"
+                <line
+                  x1="0"
+                  y1={100 - (threshold / 100) * 80}
+                  x2="400"
+                  y2={100 - (threshold / 100) * 80}
+                  stroke="#4edea3"
                   strokeWidth="1"
+                  strokeDasharray="3 3"
+                  opacity="0.6"
                 />
+                <text
+                  x="300"
+                  y={95 - (threshold / 100) * 80}
+                  fill="#4edea3"
+                  fontSize="8"
+                  fontFamily="monospace"
+                >
+                  THRESHOLD ({threshold}%)
+                </text>
 
-                {/* Peak 1 */}
-                <path d="M5,90 L20,10 L35,90" fill="none" stroke="#4cd7f6" strokeWidth="2.5" />
-                <circle cx="20" cy="10" r="3" fill="#4edea3" />
+                {/* Waveform curve */}
+                <path d={waveformPath} fill="none" stroke="#4cd7f6" strokeWidth="1.8" />
 
-                {/* Peak 2 */}
-                <path d="M135,90 L150,12 L165,90" fill="none" stroke="#4cd7f6" strokeWidth="2.5" />
-                <circle cx="150" cy="12" r="3" fill="#4edea3" />
-
-                {/* Peak 3 */}
-                <path d="M265,90 L280,15 L295,90" fill="none" stroke="#4cd7f6" strokeWidth="2.5" />
-                <circle cx="280" cy="15" r="3" fill="#4edea3" />
+                {/* Peak Markers */}
+                {peakCircles.map((c, i) => (
+                  <g key={i}>
+                    <circle cx={c.cx} cy={c.cy} r="4" fill="#4edea3" />
+                    <line
+                      x1={c.cx}
+                      y1={c.cy}
+                      x2={c.cx}
+                      y2="95"
+                      stroke="#4cd7f6"
+                      strokeDasharray="2 2"
+                      opacity="0.7"
+                    />
+                  </g>
+                ))}
               </svg>
 
               <span className="absolute bottom-2 left-3 font-mono text-[10px] text-[#869397]">
-                Bit Offset 0 → 3072 bits
+                Bit Offset 0 → {activeSignal.demodulationResult ? `${activeSignal.demodulationResult.numBits} bits` : '3072 bits'}
               </span>
               <span className="absolute top-2 left-3 font-mono text-[10px] text-[#4cd7f6]">
-                Target Sync: {selectedPattern.hex}
+                Target Sync: {customHex || selectedPattern.hex}
               </span>
             </div>
 
             {/* Identified Payload Boundaries Table */}
             <div className="flex flex-col gap-2 pt-2 border-t border-[#262a35]">
               <span className="font-mono text-[11px] text-[#869397] uppercase">
-                Identified Framing &amp; Payload Boundaries
+                Identified Framing &amp; Payload Boundaries ({matches.length} Detected)
               </span>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
                 {matches.map((m, i) => (
                   <div
                     key={i}
@@ -274,10 +349,10 @@ export const CorrelationView: React.FC<CorrelationViewProps> = ({ activeSignal }
 
                     <div className="flex items-center gap-4 text-[11px]">
                       <span className="text-[#869397]">
-                        PSR: <strong className="text-[#4edea3]">{m.psrDb} dB</strong>
+                        PSR: <strong className="text-[#4edea3]">{m.psrDb.toFixed(1)} dB</strong>
                       </span>
                       <span className="text-[#869397]">
-                        Confidence: <strong className="text-[#4cd7f6]">{m.confidence}%</strong>
+                        Confidence: <strong className="text-[#4cd7f6]">{m.confidence.toFixed(1)}%</strong>
                       </span>
                     </div>
                   </div>
