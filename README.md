@@ -181,29 +181,283 @@ The generated report includes:
 
 ## 🛠️ Technology Stack
 
-| Category | Technologies |
-|---|---|
-| **Frontend Framework** | React 18, TypeScript |
-| **Build Tool** | Vite 6 |
-| **Styling** | Tailwind CSS |
-| **DSP Engine** | Custom TypeScript DSP library (`src/lib/dsp/`) |
-| **Signal Processing** | FFT, PSD, Spectrogram, Correlator, FEC, Demodulator |
-| **ML Classification** | Rule-based + statistical classifier (`src/lib/ml/`) |
-| **File Parsing** | Custom IQ/WAV parser (`src/lib/fileParser.ts`) |
-| **Report Generation** | PDF generator (`src/lib/pdfGenerator.ts`) |
-
-### Core DSP Modules (`src/lib/dsp/`)
+### System Architecture Technologies
 
 ```
-src/lib/dsp/
-├── fft.ts              # Fast Fourier Transform
-├── spectrogram.ts      # Time-frequency spectrogram
-├── signalMetrics.ts    # SNR, power, bandwidth extraction
-├── signalGenerator.ts  # Synthetic signal generation
-├── demodulator.ts      # FSK / PSK / QAM demodulation
-├── deinterleaver.ts    # Symbol de-interleaving
-├── fec.ts              # Forward error correction
-└── correlator.ts       # Cross-correlation analysis
+┌─────────────────────────────────────────────────────────────┐
+│                    SignalLens AI System                     │
+├──────────────────────┬──────────────────────────────────────┤
+│   GUI Layer          │   PyQt / PySide6                     │
+│   Visualization      │   Matplotlib / PyQtGraph             │
+├──────────────────────┼──────────────────────────────────────┤
+│   Signal Processing  │   Python + NumPy / SciPy             │
+│   DSP Pipeline       │   GNU Radio                          │
+├──────────────────────┼──────────────────────────────────────┤
+│   AI / ML Engine     │   PyTorch / scikit-learn             │
+├──────────────────────┼──────────────────────────────────────┤
+│   High-Perf Core     │   C++ (libsigmf, custom DSP)        │
+└──────────────────────┴──────────────────────────────────────┘
+```
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| 🐍 **Signal Processing** | Python + NumPy / SciPy | FFT, PSD, filtering, correlation, FEC |
+| 📡 **DSP Pipeline** | GNU Radio | Flowgraph-based signal routing and demodulation |
+| 🤖 **AI Classification** | PyTorch | Deep learning-based modulation classifier |
+| 📊 **ML Utilities** | scikit-learn | Feature extraction, preprocessing, evaluation |
+| 🖥️ **GUI** | PyQt / PySide6 | Cross-platform desktop GUI |
+| 📈 **Visualization** | Matplotlib / PyQtGraph | Waveform, spectrum, waterfall, constellation plots |
+| ⚡ **High-Performance** | C++ | Real-time signal processing hot paths |
+
+---
+
+### 🐍 Python + NumPy / SciPy — Signal Processing & DSP
+
+The core signal processing engine is built on Python's scientific stack:
+
+```python
+# Signal parameter extraction using NumPy/SciPy
+import numpy as np
+from scipy import signal, fft
+
+# FFT-based spectrum analysis
+frequencies = fft.fftfreq(N, d=1/sample_rate)
+spectrum    = np.abs(fft.fft(iq_samples)) ** 2
+
+# Welch PSD estimation
+freq, psd = signal.welch(iq_samples, fs=sample_rate, nperseg=1024)
+
+# Bandwidth estimation from PSD
+center_freq = frequencies[np.argmax(spectrum)]
+bandwidth   = estimate_3db_bandwidth(freq, psd)
+```
+
+**Modules:**
+
+| Module | Responsibility |
+|---|---|
+| `numpy` | Array operations, FFT, math |
+| `scipy.signal` | Filtering, PSD (Welch), correlation |
+| `scipy.fft` | Fast Fourier Transform |
+| `scipy.special` | Error functions, FEC helpers |
+
+---
+
+### 📡 GNU Radio — Signal Processing Pipeline
+
+GNU Radio provides the flowgraph-based pipeline for real-time and file-based signal processing:
+
+```
+┌─────────────┐    ┌──────────────┐    ┌────────────────┐
+│ File Source  │───►│  Low-Pass    │───►│  Demodulator   │
+│ (.iq / .wav) │    │  Filter      │    │  (FM/AM/PSK)   │
+└─────────────┘    └──────────────┘    └────────────────┘
+                                                │
+                          ┌─────────────────────▼──────────────────┐
+                          │  Sink: File / GUI / Python Callback     │
+                          └────────────────────────────────────────┘
+```
+
+**Key GNU Radio Blocks Used:**
+
+| Block | Purpose |
+|---|---|
+| `blocks.file_source` | Read IQ/WAV from disk |
+| `filter.low_pass_filter` | Anti-aliasing / channel filter |
+| `analog.fm_demod_cf` | FM demodulation |
+| `digital.psk_demod` | PSK demodulation |
+| `digital.constellation_decoder_cb` | QAM/PSK symbol decisions |
+| `fft.logpwrfft_c` | Real-time FFT for spectrum display |
+
+---
+
+### 🤖 PyTorch / scikit-learn — AI-Based Classification
+
+The modulation classifier uses a CNN trained on spectrogram images:
+
+```python
+import torch
+import torch.nn as nn
+
+class ModulationClassifier(nn.Module):
+    """
+    CNN-based modulation classifier.
+    Input:  Spectrogram image  (1 × 128 × 128)
+    Output: Modulation probabilities (N classes)
+    """
+    def __init__(self, num_classes=8):
+        super().__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((4, 4)),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(128 * 4 * 4, 256),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(256, num_classes),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        return self.classifier(x)
+
+# Supported modulation types
+MODULATIONS = ["BPSK", "QPSK", "8-PSK", "16-QAM",
+               "64-QAM", "FSK-2", "FSK-4", "AM-DSB"]
+```
+
+**scikit-learn** is used for feature-based classification and preprocessing:
+
+```python
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+
+# Feature vector: [SNR, bandwidth, spectral_kurtosis,
+#                  cyclostationary_features, AM_index...]
+classifier = RandomForestClassifier(n_estimators=100)
+```
+
+---
+
+### 🖥️ PyQt / PySide6 — GUI Development
+
+The desktop GUI is built with PySide6 (Qt6):
+
+```python
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout,
+    QHBoxLayout, QSplitter, QTabWidget
+)
+from PySide6.QtCore import Qt, QThread, Signal
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("SignalLens AI — PS 26147")
+        self._setup_ui()
+
+    def _setup_ui(self):
+        # 4-quadrant visualizer layout
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(self.waveform_panel)
+        splitter.addWidget(self.spectrum_panel)
+        # ...
+```
+
+---
+
+### 📈 Matplotlib / PyQtGraph — Signal Visualization
+
+**PyQtGraph** handles real-time plots (low-latency GPU-accelerated):
+
+```python
+import pyqtgraph as pg
+
+# Waterfall spectrogram — real-time update
+self.waterfall = pg.ImageItem()
+self.waterfall.setColorMap(pg.colormap.get('CET-L9'))
+
+# Constellation diagram
+self.scatter = pg.ScatterPlotItem(size=3, pen=None,
+                                   brush=pg.mkBrush(0, 200, 255, 180))
+```
+
+**Matplotlib** is used for static report charts:
+
+```python
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+axes[0,0].plot(time, amplitude, color='#00e5ff')
+axes[0,1].semilogy(freq, psd,   color='#c8f400')
+axes[1,0].imshow(spectrogram, aspect='auto', cmap='jet')
+axes[1,1].scatter(I, Q, s=1, alpha=0.3, color='cyan')
+```
+
+---
+
+### ⚡ C++ — High-Performance Processing
+
+Performance-critical DSP routines are implemented in C++ and exposed to Python via `pybind11`:
+
+```cpp
+// fft_engine.cpp — FFTW3-based high-performance FFT
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <fftw3.h>
+
+namespace py = pybind11;
+
+py::array_t<double> compute_psd(py::array_t<std::complex<double>> samples,
+                                  int nfft, double sample_rate) {
+    // FFTW3 plan for maximum performance
+    fftw_complex *in  = fftw_alloc_complex(nfft);
+    fftw_complex *out = fftw_alloc_complex(nfft);
+    fftw_plan plan = fftw_plan_dft_1d(nfft, in, out,
+                                       FFTW_FORWARD, FFTW_ESTIMATE);
+    // ... compute PSD ...
+    fftw_destroy_plan(plan);
+    return result;
+}
+
+PYBIND11_MODULE(signal_engine, m) {
+    m.def("compute_psd", &compute_psd, "FFTW3-based PSD computation");
+}
+```
+
+**C++ Components:**
+
+| Component | Library | Purpose |
+|---|---|---|
+| FFT Engine | FFTW3 | Ultra-fast FFT computation |
+| FEC Decoder | libcorrect | Viterbi / Reed-Solomon decoding |
+| Correlator | Custom SIMD | Cross-correlation with AVX2 intrinsics |
+| File Parser | libsigmf | IQ file format parsing |
+
+---
+
+### Core DSP Modules
+
+```
+src/
+├── dsp/
+│   ├── fft.py              # FFT wrapper (NumPy + C++ backend)
+│   ├── spectrogram.py      # Short-time FFT spectrogram
+│   ├── signal_metrics.py   # SNR, power, bandwidth extraction
+│   ├── signal_generator.py # Synthetic signal generation
+│   ├── demodulator.py      # FSK / PSK / QAM demodulation
+│   ├── deinterleaver.py    # Symbol de-interleaving
+│   ├── fec.py              # Forward error correction
+│   └── correlator.py       # Cross-correlation analysis
+│
+├── ml/
+│   ├── modulation_classifier.py  # PyTorch CNN classifier
+│   ├── feature_extractor.py      # Statistical feature extraction
+│   └── models/                   # Pre-trained model weights
+│
+├── gui/
+│   ├── main_window.py            # PySide6 main window
+│   ├── waveform_panel.py         # Time domain widget
+│   ├── spectrum_panel.py         # Frequency spectrum widget
+│   ├── waterfall_panel.py        # Spectrogram widget
+│   └── constellation_panel.py    # I/Q scatter widget
+│
+├── cpp/
+│   ├── fft_engine.cpp            # FFTW3 high-perf FFT
+│   ├── correlator.cpp            # SIMD correlator
+│   ├── fec_decoder.cpp           # Viterbi decoder
+│   └── CMakeLists.txt
+│
+└── pipeline.py                   # GNU Radio flowgraph
 ```
 
 ---

@@ -1,0 +1,60 @@
+# SignalLens AI — Python Requirements
+# Problem Statement PS 26147 — Smart India Hackathon 2026
+#
+# Install with: pip install -r requirements.txt
+#
+# Note: GNU Radio must be installed separately via system package manager:
+#   Ubuntu/Debian: sudo apt install gnuradio
+#   macOS:         brew install gnuradio
+#   Windows:       Use radioconda (https://github.com/ryanvolz/radioconda)
+
+# ──────────────────────────────────────────────
+# Core Scientific Stack
+# ──────────────────────────────────────────────
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ──────────────────────────────────────────────
+# AI / Machine Learning
+# ──────────────────────────────────────────────
+torch>=2.0.0
+torchvision>=0.15.0
+scikit-learn>=1.2.0
+joblib>=1.2.0
+
+# ──────────────────────────────────────────────
+# GUI — PySide6 (Qt6)
+# ──────────────────────────────────────────────
+PySide6>=6.5.0
+
+# ──────────────────────────────────────────────
+# Visualization
+# ──────────────────────────────────────────────
+matplotlib>=3.7.0
+pyqtgraph>=0.13.0
+
+# ──────────────────────────────────────────────
+# Signal File Handling
+# ──────────────────────────────────────────────
+SigMF>=1.0.0          # IQ file metadata (SigMF format)
+soundfile>=0.12.0     # WAV file reading
+h5py>=3.8.0           # HDF5 / complex IQ storage
+
+# ──────────────────────────────────────────────
+# C++ Bridge
+# ──────────────────────────────────────────────
+pybind11>=2.10.0      # Python ↔ C++ bindings
+
+# ──────────────────────────────────────────────
+# Report Generation
+# ──────────────────────────────────────────────
+reportlab>=3.6.0      # PDF report generation
+Pillow>=9.5.0         # Image handling for reports
+
+# ──────────────────────────────────────────────
+# Utilities
+# ──────────────────────────────────────────────
+click>=8.1.0          # CLI interface
+loguru>=0.7.0         # Structured logging
+tqdm>=4.65.0          # Progress bars
+PyYAML>=6.0           # Config file parsing
