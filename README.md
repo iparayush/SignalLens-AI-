@@ -5,7 +5,8 @@
 <img src="https://img.shields.io/badge/Stack-TypeScript%20%7C%20React%20%7C%20DSP-cyan?style=for-the-badge" alt="Stack"/>
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
 
-# 📡 SignalLens AI
+# 📡 SignalLens AI  
+### by Team **AstraX**
 
 ### Automated Signal Analysis & Parameter Extraction Platform
 
@@ -606,9 +607,12 @@ npm run build
 
 ## 👥 Team
 
-**SignalLens AI**
-Smart India Hackathon 2026
-Problem Statement: **PS 26147**
+| | |
+|---|---|
+| **Team Name** | 🚀 AstraX |
+| **Project** | SignalLens AI |
+| **Event** | Smart India Hackathon 2026 |
+| **Problem Statement** | PS 26147 |
 
 ---
 
@@ -620,7 +624,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-Made with ❤️ for **Smart India Hackathon 2026**
+Made with ❤️ by **Team AstraX** for **Smart India Hackathon 2026**
 
 **PS 26147 — Automated Signal Analysis & Parameter Extraction**
 
