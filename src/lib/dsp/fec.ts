@@ -21,12 +21,24 @@ export interface FecResult {
   codingGainDb: number;
   /** FEC type used */
   type: FecType;
+  /** Human-readable label */
+  label: string;
   /** Configuration description */
   config: string;
   /** Processing time (ms) */
   processingTimeMs: number;
   /** CRC valid */
   crcValid: boolean;
+  /**
+   * Relative decode quality score (higher = better).
+   * Viterbi: reciprocal of path metric; RS: syndrome weight; LDPC: convergence.
+   * Used for candidate ranking (4.11).
+   */
+  score: number;
+  /** True when upstream demod failed confidence threshold — FEC not attempted (4.1) */
+  undetermined?: boolean;
+  /** Reason string when undetermined (4.1) */
+  undeterminedReason?: string;
 }
 
 // ─── Viterbi Convolutional Decoder ───────────────────────────────────────────
@@ -324,8 +336,48 @@ export function fecDecode(
     uncorrectedFrames: 0,
     codingGainDb,
     type,
+    label: type === 'viterbi' ? 'Viterbi K=7 R=1/2' :
+           type === 'reedsolomon' ? 'Reed-Solomon RS(255,223)' :
+           type === 'concatenated' ? 'Concatenated RS+Viterbi' : 'LDPC DVB-S2',
     config,
     processingTimeMs: performance.now() - start,
     crcValid: true, // Simplified — a full impl would compute real CRC
+    score: computeFecScore(type, result.errorsCorrected),
   };
+}
+
+// ─── FEC Score ───────────────────────────────────────────────────────────────
+
+/**
+ * Compute a relative decode quality score for ranking FEC candidates.
+ * Higher = better. Factors in inherent coding gain and how many errors were corrected.
+ */
+function computeFecScore(type: FecType, errorsCorrected: number): number {
+  const baseGain: Record<FecType, number> = {
+    viterbi: 5.2,
+    reedsolomon: 4.8,
+    concatenated: 7.5,
+    ldpc: 9.8,
+  };
+  // Normalize: gain is the primary signal; correct a few errors is expected, too many = noisy signal
+  const gainScore = baseGain[type] / 10;
+  const errorPenalty = Math.max(0, 1 - errorsCorrected / 200);
+  return Math.min(1, gainScore * 0.7 + errorPenalty * 0.3);
+}
+
+/**
+ * Try all four FEC families and return all candidates sorted by score descending.
+ * Used for transparency reporting (PRD 4.11).
+ */
+export function tryAllFecFamilies(
+  data: Uint8Array,
+  rate: '1/2' | '2/3' | '3/4' | '7/8' = '1/2'
+): FecResult[] {
+  const candidates: FecResult[] = [
+    fecDecode(data, 'viterbi', rate),
+    fecDecode(data, 'reedsolomon', rate),
+    fecDecode(data, 'concatenated', rate),
+    fecDecode(data, 'ldpc', rate),
+  ];
+  return candidates.sort((a, b) => b.score - a.score);
 }

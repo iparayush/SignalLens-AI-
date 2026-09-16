@@ -15,12 +15,24 @@ export interface DeinterleaveResult {
   data: Uint8Array;
   /** Type used */
   type: DeinterleaverType;
+  /** Human-readable name */
+  label: string;
   /** Matrix dimensions or depth used */
   params: string;
   /** Number of burst errors dispersed (estimated) */
   burstErrorsDispersed: number;
   /** Processing time (ms) */
   processingTimeMs: number;
+  /**
+   * Dispersion quality score (higher = better burst dispersal).
+   * Computed as mean run-length reciprocal: 1 / mean_run of identical bits.
+   * Used for candidate ranking (4.10).
+   */
+  score: number;
+  /** True when upstream demod failed confidence threshold — this result is notional (4.1) */
+  undetermined?: boolean;
+  /** Reason string when undetermined (4.1) */
+  undeterminedReason?: string;
 }
 
 /**
@@ -62,9 +74,11 @@ export function blockDeinterleave(
   return {
     data: output,
     type: 'block',
+    label: 'Block Matrix',
     params: `${rows}×${cols} Matrix`,
     burstErrorsDispersed: Math.floor(data.length / blockSize) * rows,
     processingTimeMs: performance.now() - start,
+    score: computeDispersionScore(output),
   };
 }
 
@@ -105,9 +119,11 @@ export function convolutionalDeinterleave(
   return {
     data: output,
     type: 'convolutional',
+    label: 'Convolutional (Forney)',
     params: `I=${branches}, M=${delayIncrement}`,
     burstErrorsDispersed: Math.floor(data.length / branches),
     processingTimeMs: performance.now() - start,
+    score: computeDispersionScore(output),
   };
 }
 
@@ -152,9 +168,11 @@ export function diagonalDeinterleave(
   return {
     data: output,
     type: 'diagonal',
+    label: 'Diagonal',
     params: `${rows}×${cols} Diagonal`,
     burstErrorsDispersed: Math.floor(data.length / blockSize) * Math.min(rows, cols),
     processingTimeMs: performance.now() - start,
+    score: computeDispersionScore(output),
   };
 }
 
@@ -204,11 +222,46 @@ export function pseudorandomDeinterleave(
   return {
     data: output,
     type: 'pseudorandom',
+    label: 'Pseudo-Random',
     params: `Block=${blockSize}, Seed=${seed}`,
     burstErrorsDispersed: numBlocks * Math.floor(Math.sqrt(blockSize)),
     processingTimeMs: performance.now() - start,
+    score: computeDispersionScore(output),
   };
 }
+
+// ─── Dispersion Score ─────────────────────────────────────────────────────────
+
+/**
+ * Compute a dispersion quality score for a de-interleaved byte stream.
+ *
+ * Score = 1 / mean_run_length (bit level).
+ * A perfectly dispersed stream has short runs → high score.
+ * Returns a value in [0, 1]; higher = better burst dispersal.
+ */
+function computeDispersionScore(data: Uint8Array): number {
+  const N = Math.min(data.length, 1024); // Limit computation
+  if (N < 2) return 0.5;
+
+  let runs = 0;
+  let prevBit = (data[0] >> 7) & 1;
+
+  for (let i = 0; i < N; i++) {
+    for (let b = 7; b >= 0; b--) {
+      const bit = (data[i] >> b) & 1;
+      if (bit !== prevBit) {
+        runs++;
+        prevBit = bit;
+      }
+    }
+  }
+
+  const totalBits = N * 8;
+  const meanRunLength = totalBits / Math.max(runs, 1);
+  return Math.min(1, 1 / meanRunLength);
+}
+
+// ─── Main Interface ──────────────────────────────────────────────────────────
 
 /**
  * Run de-interleaving with the specified type and parameters.
@@ -231,4 +284,23 @@ export function deinterleave(
     default:
       return blockDeinterleave(data, rows, cols);
   }
+}
+
+/**
+ * Try all four de-interleaver types with standard parameters.
+ * Returns all results sorted by score descending — best candidate first.
+ * Used for transparency reporting (PRD 4.10).
+ */
+export function tryAllDeinterleavers(
+  data: Uint8Array,
+  rows: number = 16,
+  cols: number = 32
+): DeinterleaveResult[] {
+  const candidates: DeinterleaveResult[] = [
+    blockDeinterleave(data, rows, cols),
+    convolutionalDeinterleave(data, rows, cols),
+    diagonalDeinterleave(data, rows, cols),
+    pseudorandomDeinterleave(data, rows * cols),
+  ];
+  return candidates.sort((a, b) => b.score - a.score);
 }

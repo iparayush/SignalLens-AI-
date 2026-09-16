@@ -48,22 +48,48 @@ export interface PipelineProgressInfo {
   message: string;
 }
 
+/** Confidence gating thresholds (4.1) */
+export interface PipelineThresholds {
+  /** Maximum EVM (%) for demod to be considered locked */
+  maxEvmPct: number;
+  /** Minimum modulation classification confidence (%) to proceed */
+  minModConfidence: number;
+  /** Minimum sync pattern length in bytes to be considered significant (4.4) */
+  minSyncMatchLengthBytes: number;
+}
+
+export const DEFAULT_THRESHOLDS: PipelineThresholds = {
+  maxEvmPct: 30,
+  minModConfidence: 70,
+  minSyncMatchLengthBytes: 4,
+};
+
 export interface TelemetryMetrics {
   modulation: ModulationType;
   modulationMatch: number; // e.g. 99.4
   samplingFreqMHz: number; // e.g. 2.400
   samplingFreqConfidence: number; // e.g. 100
   symbolRateMSym: number; // e.g. 1.200
+  symbolRateHz: number; // raw Hz for auto-scaling display (4.2)
   symbolRateConfidence: number; // e.g. 98.9
   bandwidthMHz: number; // e.g. 1.440
+  bandwidthHz: number; // raw Hz for auto-scaling display (4.2)
   bandwidthConfidence: number; // e.g. 99.1
   fecCode: string; // e.g. 'Viterbi K=7, R=1/2'
   fecDetected: boolean;
+  /** true when upstream confidence was too low to run FEC (4.1) */
+  fecUndetermined: boolean;
+  /** The threshold label that blocked FEC, if undetermined */
+  fecUndeterminedReason: string;
   interleaving: string; // e.g. 'Matrix 16x32 Block'
   interleavingConfidence: number; // e.g. 97.6
+  /** true when upstream confidence was too low to run de-interleaving (4.1) */
+  interleavingUndetermined: boolean;
+  /** The threshold label that blocked de-interleaving, if undetermined */
+  interleavingUndeterminedReason: string;
   estimatedSnrDb: number; // e.g. 24.8
   snrQuality: 'Optimal' | 'Good' | 'Degraded' | 'Marginal';
-  centerCarrierMHz: number; // e.g. 433.920
+  centerCarrierMHz: number; // legacy field, kept for sample data compat
   carrierLocked: boolean;
   overallConfidence: number; // e.g. 98.7
   algorithm: string;
@@ -106,6 +132,10 @@ export interface CorrelationData {
   detThresholdDb: number;
   crossCorrLength: number;
   peakToSidelobeStatus: 'PASS' | 'WARN' | 'FAIL';
+  /** True only when match length >= minSyncMatchLengthBytes (4.4) */
+  hasSignificantMatch: boolean;
+  /** Length of the matched pattern in bytes */
+  syncMatchLengthBytes: number;
 }
 
 export interface SignalProfile {
@@ -131,14 +161,24 @@ export interface SignalProfile {
   constellationType: 'QPSK' | 'BPSK' | '16-QAM' | 'FSK';
   evmRms: number;
   phaseJitterDeg: number;
+
   emitterProfile: {
     callsign: string;
     classification: string;
+    /** Human-readable location note. Never a geolocation from single-sensor capture (4.5). */
+    locationNote: string;
+    /** Legacy display string — shown in sample data, 'Not determinable...' for computed */
     estimatedLocation: string;
-    coordinates: [number, number];
+    /** Only present when real multi-sensor geolocation was computed (4.5) */
+    coordinates?: [number, number];
     threatLevel: 'Low' | 'Medium' | 'High' | 'Critical';
     targetDesignation: string;
   };
+
+  /** RF Center Frequency from file metadata or user input (4.3) */
+  rfCenterFreqHz?: number;
+  /** Residual carrier offset measured from the signal post-downconversion (4.3) */
+  residualCarrierOffsetHz?: number;
 
   // ── Real DSP computed data (populated after pipeline runs) ──
 
@@ -166,8 +206,14 @@ export interface SignalProfile {
   /** De-interleaving results */
   deinterleaveResult?: DeinterleaveResult;
 
+  /** All de-interleaver candidates tried with scores (4.10) */
+  deinterleaveCandidates?: DeinterleaveResult[];
+
   /** FEC decode results */
   fecResult?: FecResult;
+
+  /** All FEC family candidates tried with scores (4.11) */
+  fecCandidates?: FecResult[];
 
   /** Correlation results */
   correlationResult?: CorrelationResult;
@@ -177,4 +223,7 @@ export interface SignalProfile {
 
   /** Total pipeline processing time (ms) */
   processingTimeMs?: number;
+
+  /** Pipeline thresholds used during analysis (4.1) */
+  pipelineThresholds?: PipelineThresholds;
 }

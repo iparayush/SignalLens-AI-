@@ -21,6 +21,13 @@ export interface CorrelationMatch {
   patternName: string;
   /** Matched hex string */
   matchedHex: string;
+  /**
+   * True when the matched pattern is >= MIN_SIGNIFICANT_MATCH_BYTES long.
+   * WARN-status (false) matches are displayed but must NOT drive threat escalation (4.4).
+   */
+  isSignificant: boolean;
+  /** Pattern length in bytes (for display) */
+  patternLengthBytes: number;
 }
 
 export interface CorrelationResult {
@@ -38,7 +45,21 @@ export interface CorrelationResult {
   estimatedFrameLengthBytes: number | null;
   /** Processing time (ms) */
   processingTimeMs: number;
+  /**
+   * True when at least one match meets the MIN_SIGNIFICANT_MATCH_BYTES threshold.
+   * Only significant matches may drive threat escalation (4.4).
+   */
+  hasSignificantMatch: boolean;
 }
+
+// ─── Significance Threshold ─────────────────────────────────────────────────
+
+/**
+ * Minimum pattern length (bytes) for a match to be considered statistically
+ * significant (1/256 random chance per byte → 4 bytes = 1/4B chance).
+ * Matches below this length are flagged WARN and excluded from threat scoring.
+ */
+export const MIN_SIGNIFICANT_MATCH_BYTES = 4;
 
 // ─── Known Sync Patterns ─────────────────────────────────────────────────────
 
@@ -239,6 +260,7 @@ export function correlateStream(
   const avgSidelobe = sidelobeCount > 0 ? sidelobeSum / sidelobeCount : 0.01;
 
   // Build matches
+  const patternLengthBytes = Math.ceil(patternBits.length / 8);
   const matches: CorrelationMatch[] = positions.map((pos, idx) => {
     const peakVal = values[idx];
     const psrDb = 20 * Math.log10(Math.max(peakVal, 1e-10) / Math.max(avgSidelobe, 1e-10));
@@ -252,6 +274,8 @@ export function correlateStream(
       confidence: Math.round(confidence * 10) / 10,
       patternName,
       matchedHex: patternHex,
+      isSignificant: patternLengthBytes >= MIN_SIGNIFICANT_MATCH_BYTES,
+      patternLengthBytes,
     };
   });
 
@@ -298,6 +322,8 @@ export function correlateStream(
   const bestPeakVal = values.length > 0 ? Math.max(...values) : 0;
   const bestPsrDb = 20 * Math.log10(Math.max(bestPeakVal, 1e-10) / Math.max(avgSidelobe, 1e-10));
 
+  const hasSignificantMatch = matches.some((m) => m.isSignificant);
+
   return {
     matches: matches.slice(0, 20), // Limit to top 20 matches
     correlationWaveform: waveform,
@@ -306,6 +332,7 @@ export function correlateStream(
     bestPsrDb: Math.round(bestPsrDb * 10) / 10,
     estimatedFrameLengthBytes,
     processingTimeMs: performance.now() - start,
+    hasSignificantMatch,
   };
 }
 
@@ -341,6 +368,7 @@ export function autoCorrelate(
       bestPsrDb: 0,
       estimatedFrameLengthBytes: null,
       processingTimeMs: 0,
+      hasSignificantMatch: false,
     };
   }
 

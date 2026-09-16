@@ -91,6 +91,25 @@ export const DecodePipelineView: React.FC<DecodePipelineViewProps> = ({ activeSi
         </div>
       )}
 
+      {/* 4.1 — UNDETERMINED Gate Warning */}
+      {(activeSignal.telemetry.fecUndetermined || activeSignal.telemetry.interleavingUndetermined) && (
+        <div className="px-4 py-3 rounded bg-amber-900/20 border border-amber-600/40 flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-amber-400 font-mono text-xs font-bold">
+            <span>⚠️ PIPELINE GATED — UNDETERMINED</span>
+          </div>
+          <p className="font-mono text-[11px] text-amber-300/80">
+            {activeSignal.telemetry.fecUndetermined
+              ? activeSignal.telemetry.fecUndeterminedReason
+              : activeSignal.telemetry.interleavingUndeterminedReason}
+          </p>
+          <p className="font-mono text-[10px] text-amber-200/50">
+            De-interleaving and FEC were not attempted. Results shown below are from prior sample data or a manual re-run.
+            To clear this, re-upload the file after verifying carrier lock (EVM &lt; {activeSignal.pipelineThresholds?.maxEvmPct ?? 30}%,
+            mod-confidence &gt; {activeSignal.pipelineThresholds?.minModConfidence ?? 70}%).
+          </p>
+        </div>
+      )}
+
       {/* Grid: De-interleaver on Left, FEC on Right */}
       <div className="grid grid-cols-12 gap-5">
         {/* Section 1: De-interleaver */}
@@ -336,8 +355,96 @@ export const DecodePipelineView: React.FC<DecodePipelineViewProps> = ({ activeSi
                 <strong className="text-[#4edea3]">VALID (0x8F92A1D0)</strong>
               </div>
             </div>
+
+            {/* 4.11 — FEC Candidate Table */}
+            {activeSignal.fecCandidates && activeSignal.fecCandidates.length > 1 && !activeSignal.fecCandidates[0].undetermined && (
+              <div className="bg-[#0a0e18] rounded border border-[#262a35] overflow-hidden mt-2">
+                <div className="px-3 py-2 border-b border-[#262a35]">
+                  <span className="font-mono text-[11px] text-[#4edea3] font-bold uppercase">All FEC Family Candidates (Ranked by Decode Score)</span>
+                </div>
+                <table className="w-full font-mono text-[11px]">
+                  <thead>
+                    <tr className="border-b border-[#262a35] text-[#869397]">
+                      <th className="px-3 py-1.5 text-left">#</th>
+                      <th className="px-3 py-1.5 text-left">Family</th>
+                      <th className="px-3 py-1.5 text-right">Score</th>
+                      <th className="px-3 py-1.5 text-right">Errors Fixed</th>
+                      <th className="px-3 py-1.5 text-right">Gain (dB)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeSignal.fecCandidates.map((c, i) => (
+                      <tr key={c.type} className={`border-b border-[#1e2330] ${i === 0 ? 'bg-[#4edea3]/5' : ''}`}>
+                        <td className="px-3 py-1.5 text-[#869397]">{i + 1}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={i === 0 ? 'text-[#4edea3] font-bold' : 'text-[#bcc9cd]'}>{c.label}</span>
+                          {i === 0 && <span className="ml-2 text-[9px] bg-[#4edea3]/20 text-[#4edea3] px-1 rounded">BEST</span>}
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <span className={i === 0 ? 'text-[#4edea3] font-bold' : 'text-[#bcc9cd]'}>
+                            {(c.score * 100).toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-[#4cd7f6]">{c.errorsCorrected}</td>
+                        <td className="px-3 py-1.5 text-right text-[#869397]">+{c.codingGainDb.toFixed(1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* 4.10 — De-interleaver Candidate Table (below grid, full-width) */}
+        {activeSignal.deinterleaveCandidates && activeSignal.deinterleaveCandidates.length > 1 && !activeSignal.deinterleaveCandidates[0].undetermined && (
+          <div className="col-span-12 bg-[#171b26] rounded border border-[#262a35] overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[#262a35]">
+              <span className="font-mono text-[11px] text-[#4cd7f6] font-bold uppercase">
+                De-interleaver Transparency — All Candidates Ranked by Burst Dispersal Score
+              </span>
+            </div>
+            <table className="w-full font-mono text-[11px]">
+              <thead>
+                <tr className="border-b border-[#262a35] text-[#869397]">
+                  <th className="px-4 py-2 text-left">#</th>
+                  <th className="px-4 py-2 text-left">Architecture</th>
+                  <th className="px-4 py-2 text-left">Parameters</th>
+                  <th className="px-4 py-2 text-right">Dispersion Score</th>
+                  <th className="px-4 py-2 text-right">Burst Errors Dispersed</th>
+                  <th className="px-4 py-2 text-right">Time (ms)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeSignal.deinterleaveCandidates.map((c, i) => (
+                  <tr key={c.type} className={`border-b border-[#1e2330] ${i === 0 ? 'bg-[#4cd7f6]/5' : ''}`}>
+                    <td className="px-4 py-2 text-[#869397]">{i + 1}</td>
+                    <td className="px-4 py-2">
+                      <span className={i === 0 ? 'text-[#4cd7f6] font-bold' : 'text-[#bcc9cd]'}>{c.label}</span>
+                      {i === 0 && <span className="ml-2 text-[9px] bg-[#4cd7f6]/20 text-[#4cd7f6] px-1 rounded">SELECTED</span>}
+                    </td>
+                    <td className="px-4 py-2 text-[#869397]">{c.params}</td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="w-20 h-1.5 bg-[#1e2330] rounded overflow-hidden">
+                          <div
+                            className="h-full rounded bg-[#4cd7f6]"
+                            style={{ width: `${(c.score / (activeSignal.deinterleaveCandidates?.[0]?.score || 1)) * 100}%` }}
+                          />
+                        </div>
+                        <span className={i === 0 ? 'text-[#4edea3] font-bold' : 'text-[#bcc9cd]'}>
+                          {(c.score * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-right text-[#4cd7f6]">{c.burstErrorsDispersed}</td>
+                    <td className="px-4 py-2 text-right text-[#869397]">{c.processingTimeMs.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

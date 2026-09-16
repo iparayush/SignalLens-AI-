@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { SignalProfile } from '../types';
-import { Network, Activity, Layers, RotateCcw } from 'lucide-react';
+import { Network, Activity, Layers, RotateCcw, Waves, Crosshair } from 'lucide-react';
 import { welchPSD, type WindowType } from '../lib/dsp/fft';
+import { WaterfallPanel } from './WaterfallPanel';
+import { ConstellationPlot } from './ConstellationPlot';
 
 interface SignalAnalysisViewProps {
   activeSignal: SignalProfile;
@@ -255,11 +257,11 @@ export const SignalAnalysisView: React.FC<SignalAnalysisViewProps> = ({ activeSi
 
         {/* Constellation & EVM Scope */}
         <div className="col-span-12 lg:col-span-4 bg-[#171b26] p-4 rounded border border-[#262a35] flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#4cd7f6]" />
+              <Crosshair className="w-4 h-4 text-[#4edea3]" />
               <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#dfe2f1]">
-                Demodulated Constellation
+                I/Q Constellation Diagram
               </h2>
             </div>
             <span className="font-mono text-xs font-bold text-[#4edea3]">
@@ -267,47 +269,14 @@ export const SignalAnalysisView: React.FC<SignalAnalysisViewProps> = ({ activeSi
             </span>
           </div>
 
-          <div className="relative w-full h-72 bg-[#0a0e18] rounded border border-[#262a35] overflow-hidden flex items-center justify-center">
-            <svg className="w-full h-full" viewBox="0 0 200 200">
-              {/* Axes */}
-              <line x1="100" y1="10" x2="100" y2="190" stroke="#313540" strokeWidth="1" />
-              <line x1="10" y1="100" x2="190" y2="100" stroke="#313540" strokeWidth="1" />
-              <circle cx="100" cy="100" r="65" fill="none" stroke="#1c1f2a" strokeDasharray="3 3" strokeWidth="1" />
-
-              {/* Ideal Decision Slices */}
-              <circle cx="55" cy="55" r="4" fill="none" stroke="#869397" strokeDasharray="2 2" />
-              <circle cx="145" cy="55" r="4" fill="none" stroke="#869397" strokeDasharray="2 2" />
-              <circle cx="55" cy="145" r="4" fill="none" stroke="#869397" strokeDasharray="2 2" />
-              <circle cx="145" cy="145" r="4" fill="none" stroke="#869397" strokeDasharray="2 2" />
-
-              {/* Real or clustered constellation points */}
-              {constellationPoints ? (
-                <g fill="#4cd7f6" opacity="0.8">
-                  {constellationPoints.map((pt) => (
-                    <circle key={pt.key} cx={pt.cx} cy={pt.cy} r={pt.r} />
-                  ))}
-                </g>
-              ) : (
-                [
-                  [145, 55],
-                  [55, 55],
-                  [55, 145],
-                  [145, 145],
-                ].map(([cx, cy], i) => (
-                  <g key={i} fill="#4cd7f6" opacity="0.8">
-                    <circle cx={cx - 2} cy={cy + 1} r="2.2" />
-                    <circle cx={cx + 3} cy={cy - 2} r="1.8" />
-                    <circle cx={cx - 1} cy={cy - 3} r="1.6" />
-                    <circle cx={cx + 2} cy={cy + 3} r="2.0" />
-                    <circle cx={cx - 4} cy={cy} r="1.5" />
-                    <circle cx={cx + 1} cy={cy - 1} r="2.4" />
-                  </g>
-                ))
-              )}
-            </svg>
-
-            <span className="absolute top-2 right-3 font-mono text-[9px] text-[#869397]">Q: Quadrature</span>
-            <span className="absolute bottom-2 right-3 font-mono text-[9px] text-[#869397]">I: In-Phase</span>
+          {/* Standalone ConstellationPlot (PRD 4.7) */}
+          <div className="w-full bg-[#0a0e18] rounded border border-[#262a35] overflow-hidden">
+            <ConstellationPlot
+              activeSignal={activeSignal}
+              width={400}
+              height={340}
+              className="w-full"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs font-mono text-[#bcc9cd]">
@@ -316,13 +285,41 @@ export const SignalAnalysisView: React.FC<SignalAnalysisViewProps> = ({ activeSi
               <strong className="text-[#dfe2f1]">±{activeSignal.phaseJitterDeg.toFixed(1)}° RMS</strong>
             </div>
             <div className="bg-[#1c1f2a] p-2 rounded border border-[#313540]">
-              <span className="text-[#869397] text-[10px] block">CFO / Carrier:</span>
+              <span className="text-[#869397] text-[10px] block">
+                {activeSignal.residualCarrierOffsetHz !== undefined ? 'Residual Carrier Offset:' : 'CFO / Carrier:'}
+              </span>
               <strong className="text-[#4edea3]">
-                {activeSignal.demodulationResult ? `${activeSignal.demodulationResult.cfoHz.toFixed(1)} Hz` : '1.42% Peak'}
+                {activeSignal.residualCarrierOffsetHz !== undefined
+                  ? `${activeSignal.residualCarrierOffsetHz.toFixed(1)} Hz (offset)`
+                  : activeSignal.demodulationResult ? `${activeSignal.demodulationResult.cfoHz.toFixed(1)} Hz` : '—'}
               </strong>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Waterfall / Time-Frequency Panel (PRD 4.8) — always rendered */}
+      <div className="bg-[#171b26] p-4 rounded border border-[#262a35] flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Waves className="w-4 h-4 text-[#4edea3]" />
+            <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-[#dfe2f1]">
+              Waterfall — Time × Frequency Intensity
+            </h2>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-mono text-[#869397]">
+            <span>Fs: {activeSignal.fsFormatted}</span>
+            <span>Dur: {activeSignal.durFormatted}</span>
+            {activeSignal.isComputed && (
+              <span className="text-emerald-400">● STFT computed</span>
+            )}
+          </div>
+        </div>
+        <WaterfallPanel
+          activeSignal={activeSignal}
+          waterfallHeight={260}
+          className="w-full"
+        />
       </div>
     </div>
   );

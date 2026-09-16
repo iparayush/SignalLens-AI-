@@ -4,18 +4,23 @@
  * Coordinates the full end-to-end signal analysis workflow:
  *   Parse → FFT/PSD → Classify → Demodulate → De-interleave → FEC → Correlate
  *
+ * Confidence gating (PRD 4.1): each stage forwards a confidence/quality score.
+ * Downstream stages only run if upstream confidence clears defined thresholds;
+ * otherwise the field shows UNDETERMINED with a clear reason.
+ *
  * Emits progress events for real-time UI updates.
  */
 
 import { parseSignalFile, type ParsedSignalFile, type SampleFormat } from './fileParser';
-import { welchPSD, findPeaks, estimateBandwidth3dB, estimateBandwidth99, estimateSNR } from './dsp/fft';
+import { welchPSD, findPeaks, estimateBandwidth3dB, estimateSNR } from './dsp/fft';
 import { computeSpectrogram, type SpectrogramResult } from './dsp/spectrogram';
 import { analyzeSignalMetrics, type SignalMetrics } from './dsp/signalMetrics';
 import { demodulate, type DemodulationResult, type ModulationScheme } from './dsp/demodulator';
-import { deinterleave, type DeinterleaveResult, type DeinterleaverType } from './dsp/deinterleaver';
-import { fecDecode, type FecResult, type FecType } from './dsp/fec';
+import { tryAllDeinterleavers, deinterleave, type DeinterleaveResult, type DeinterleaverType } from './dsp/deinterleaver';
+import { tryAllFecFamilies, fecDecode, type FecResult, type FecType } from './dsp/fec';
 import { autoCorrelate, correlateStream, type CorrelationResult, KNOWN_SYNC_PATTERNS } from './dsp/correlator';
 import { classifyModulation, type ClassificationResult } from './ml/modulationClassifier';
+import type { PipelineThresholds } from '../types';
 
 // ─── Pipeline Types ──────────────────────────────────────────────────────────
 
@@ -55,6 +60,8 @@ export interface PipelineConfig {
   fecType: FecType;
   /** Correlation pattern (null = auto-detect) */
   correlationPattern: string | null;
+  /** Confidence gating thresholds (4.1) */
+  thresholds: PipelineThresholds;
 }
 
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
@@ -65,6 +72,11 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   deinterleaverType: 'block',
   fecType: 'viterbi',
   correlationPattern: null,
+  thresholds: {
+    maxEvmPct: 30,
+    minModConfidence: 70,
+    minSyncMatchLengthBytes: 4,
+  },
 };
 
 export interface PipelineResults {
@@ -80,12 +92,20 @@ export interface PipelineResults {
   classification: ClassificationResult;
   /** Demodulation results */
   demodulation: DemodulationResult;
-  /** De-interleaving results */
+  /** De-interleaving results (best candidate) */
   deinterleave: DeinterleaveResult;
-  /** FEC decode results */
+  /** All de-interleaver candidates tried, sorted by score (4.10) */
+  deinterleaveCandidates: DeinterleaveResult[];
+  /** FEC decode results (best candidate) */
   fec: FecResult;
+  /** All FEC family candidates tried, sorted by score (4.11) */
+  fecCandidates: FecResult[];
   /** Correlation results */
   correlation: CorrelationResult;
+  /** Whether FEC/deinterleave were gated out by confidence (4.1) */
+  stagesGated: boolean;
+  /** Human-readable reason for gating, if any */
+  gatingReason: string;
   /** Total processing time (ms) */
   totalTimeMs: number;
   /** Per-stage timing */
@@ -109,6 +129,7 @@ export async function runPipeline(
 ): Promise<PipelineResults> {
   const startTime = performance.now();
   const stageTiming: Record<string, number> = {};
+  const { thresholds } = config;
 
   const report = (stage: PipelineStage, label: string, percent: number, message: string) => {
     onProgress?.({ stage, stageLabel: label, percent, message });
@@ -124,7 +145,7 @@ export async function runPipeline(
   stageTiming['parsing'] = performance.now() - stageStart;
   report('parsing', 'File Parsing', 15, `Parsed ${parsed.numSamples.toLocaleString()} complex samples @ ${(parsed.sampleRate / 1e6).toFixed(3)} MSps`);
 
-  // ── Stage 2: Spectral Analysis ─────────────────────────────────────────
+  // ── Stage 2: Spectral Analysis (always runs — independent of gating per 4.8) ──
   report('spectral', 'Spectral Analysis', 20, 'Computing Welch PSD estimate...');
   stageStart = performance.now();
 
@@ -133,7 +154,7 @@ export async function runPipeline(
   const metrics = analyzeSignalMetrics(parsed.iq, parsed.sampleRate, config.fftSize, config.windowType);
 
   stageTiming['spectral'] = performance.now() - stageStart;
-  report('spectral', 'Spectral Analysis', 35, `SNR: +${metrics.estimatedSnrDb.toFixed(1)} dB, BW: ${(metrics.estimatedBandwidthHz / 1e3).toFixed(1)} kHz`);
+  report('spectral', 'Spectral Analysis', 35, `SNR: +${metrics.estimatedSnrDb.toFixed(1)} dB, BW: ${formatBandwidth(metrics.estimatedBandwidthHz)}`);
 
   // ── Stage 3: Modulation Classification ─────────────────────────────────
   report('classifying', 'Modulation Classification', 40, 'Running cumulant-based classifier...');
@@ -148,7 +169,7 @@ export async function runPipeline(
   const modScheme = config.overrideModulation || mapToModulationScheme(classification.detected);
   const symbolRate = metrics.estimatedSymbolRateHz > 0 ? metrics.estimatedSymbolRateHz : parsed.sampleRate / 4;
 
-  report('demodulating', 'Demodulation', 55, `Demodulating as ${modScheme} @ ${(symbolRate / 1e3).toFixed(1)} ksym/s...`);
+  report('demodulating', 'Demodulation', 55, `Demodulating as ${modScheme} @ ${formatSymbolRate(symbolRate)}...`);
   stageStart = performance.now();
 
   const demodulation = demodulate(parsed.iq, parsed.sampleRate, symbolRate, modScheme);
@@ -156,38 +177,106 @@ export async function runPipeline(
   stageTiming['demodulating'] = performance.now() - stageStart;
   report('demodulating', 'Demodulation', 65, `Recovered ${demodulation.numBits} bits, EVM: ${demodulation.evmRms.toFixed(1)}%`);
 
-  // ── Stage 5: De-interleaving ───────────────────────────────────────────
-  report('deinterleaving', 'De-interleaving', 70, `Applying ${config.deinterleaverType} de-interleaver...`);
-  stageStart = performance.now();
+  // ── Confidence Gate Check (PRD 4.1) ─────────────────────────────────────
+  const evmOk = demodulation.evmRms < thresholds.maxEvmPct;
+  const modConfOk = classification.confidence > thresholds.minModConfidence;
+  const gatingPassed = evmOk && modConfOk;
 
-  const deinterleaveResult = deinterleave(demodulation.bits, config.deinterleaverType);
+  let gatingReason = '';
+  if (!gatingPassed) {
+    const reasons: string[] = [];
+    if (!evmOk) {
+      reasons.push(`EVM ${demodulation.evmRms.toFixed(1)}% ≥ threshold ${thresholds.maxEvmPct}%`);
+    }
+    if (!modConfOk) {
+      reasons.push(`modulation confidence ${classification.confidence.toFixed(1)}% < threshold ${thresholds.minModConfidence}%`);
+    }
+    gatingReason = `Upstream stage below confidence threshold: ${reasons.join('; ')}. De-interleaving and FEC not attempted.`;
+    report('deinterleaving', 'De-interleaving', 72, `GATED — ${gatingReason}`);
+    report('fec_decoding', 'FEC Decoding', 80, `GATED — ${gatingReason}`);
+  }
 
-  stageTiming['deinterleaving'] = performance.now() - stageStart;
-  report('deinterleaving', 'De-interleaving', 78, `Dispersed ${deinterleaveResult.burstErrorsDispersed} potential burst errors`);
+  // ── Stage 5: De-interleaving (gated) ──────────────────────────────────
+  let deinterleaveResult: DeinterleaveResult;
+  let deinterleaveCandidates: DeinterleaveResult[];
 
-  // ── Stage 6: FEC Decoding ──────────────────────────────────────────────
-  report('fec_decoding', 'FEC Decoding', 80, `Running ${config.fecType} decoder...`);
-  stageStart = performance.now();
+  if (gatingPassed) {
+    report('deinterleaving', 'De-interleaving', 70, `Trying all 4 de-interleaver architectures...`);
+    stageStart = performance.now();
 
-  const fecResult = fecDecode(deinterleaveResult.data, config.fecType);
+    deinterleaveCandidates = tryAllDeinterleavers(demodulation.bits, 16, 32);
+    deinterleaveResult = deinterleaveCandidates[0]; // Best candidate
 
-  stageTiming['fec_decoding'] = performance.now() - stageStart;
-  report('fec_decoding', 'FEC Decoding', 88, `Corrected ${fecResult.errorsCorrected} errors, Gain: ${fecResult.codingGainDb.toFixed(1)} dB`);
+    stageTiming['deinterleaving'] = performance.now() - stageStart;
+    report('deinterleaving', 'De-interleaving', 78, `Best: ${deinterleaveResult.label} (score ${(deinterleaveResult.score * 100).toFixed(1)})`);
+  } else {
+    // Create UNDETERMINED sentinel
+    const emptyBytes = new Uint8Array(0);
+    deinterleaveResult = {
+      data: emptyBytes,
+      type: 'block',
+      label: 'UNDETERMINED',
+      params: 'N/A — upstream gate failed',
+      burstErrorsDispersed: 0,
+      processingTimeMs: 0,
+      score: 0,
+      undetermined: true,
+      undeterminedReason: gatingReason,
+    };
+    deinterleaveCandidates = [deinterleaveResult];
+    stageTiming['deinterleaving'] = 0;
+  }
 
-  // ── Stage 7: Correlation ───────────────────────────────────────────────
+  // ── Stage 6: FEC Decoding (gated) ─────────────────────────────────────
+  let fecResult: FecResult;
+  let fecCandidates: FecResult[];
+
+  if (gatingPassed && deinterleaveResult.data.length > 0) {
+    report('fec_decoding', 'FEC Decoding', 80, `Trying all 4 FEC families...`);
+    stageStart = performance.now();
+
+    fecCandidates = tryAllFecFamilies(deinterleaveResult.data, '1/2');
+    fecResult = fecCandidates[0]; // Best candidate
+
+    stageTiming['fec_decoding'] = performance.now() - stageStart;
+    report('fec_decoding', 'FEC Decoding', 88, `Best: ${fecResult.label} (score ${(fecResult.score * 100).toFixed(1)}, corrected ${fecResult.errorsCorrected} errors)`);
+  } else {
+    // Create UNDETERMINED sentinel
+    fecResult = {
+      data: new Uint8Array(0),
+      errorsCorrected: 0,
+      uncorrectedFrames: 0,
+      codingGainDb: 0,
+      type: 'viterbi',
+      label: 'UNDETERMINED',
+      config: 'N/A — upstream gate failed',
+      processingTimeMs: 0,
+      crcValid: false,
+      score: 0,
+      undetermined: true,
+      undeterminedReason: gatingReason,
+    };
+    fecCandidates = [fecResult];
+    stageTiming['fec_decoding'] = 0;
+  }
+
+  // ── Stage 7: Correlation ─────────────────────────────────────────────
   report('correlating', 'Bit Stream Correlation', 90, 'Searching for sync patterns...');
   stageStart = performance.now();
 
+  // Correlate against the FEC output if available, else demod bits
+  const correlateData = fecResult.data.length > 0 ? fecResult.data : demodulation.bits;
+
   let correlationResult: CorrelationResult;
   if (config.correlationPattern) {
-    correlationResult = correlateStream(fecResult.data, config.correlationPattern);
+    correlationResult = correlateStream(correlateData, config.correlationPattern);
   } else {
-    const autoResult = autoCorrelate(fecResult.data);
+    const autoResult = autoCorrelate(correlateData);
     correlationResult = autoResult.result;
   }
 
   stageTiming['correlating'] = performance.now() - stageStart;
-  report('correlating', 'Bit Stream Correlation', 98, `Found ${correlationResult.matches.length} pattern matches`);
+  report('correlating', 'Bit Stream Correlation', 98, `Found ${correlationResult.matches.length} pattern matches (significant: ${correlationResult.hasSignificantMatch})`);
 
   // ── Complete ───────────────────────────────────────────────────────────
   const totalTimeMs = performance.now() - startTime;
@@ -201,8 +290,12 @@ export async function runPipeline(
     classification,
     demodulation,
     deinterleave: deinterleaveResult,
+    deinterleaveCandidates,
     fec: fecResult,
+    fecCandidates,
     correlation: correlationResult,
+    stagesGated: !gatingPassed,
+    gatingReason,
     totalTimeMs,
     stageTiming,
   };
@@ -227,7 +320,7 @@ function mapToModulationScheme(detected: string): ModulationScheme {
 }
 
 /**
- * Utility: Format frequency for display.
+ * Auto-scale frequency for display (4.2). Never shows "0.000 MHz".
  */
 export function formatFrequency(hz: number): string {
   if (hz >= 1e9) return `${(hz / 1e9).toFixed(3)} GHz`;
@@ -237,7 +330,25 @@ export function formatFrequency(hz: number): string {
 }
 
 /**
- * Utility: Format file size.
+ * Auto-scale symbol rate for display (4.2). Fixes "0.000 MSym/s" bug.
+ */
+export function formatSymbolRate(symHz: number): string {
+  if (symHz >= 1e6) return `${(symHz / 1e6).toFixed(3)} MSym/s`;
+  if (symHz >= 1e3) return `${(symHz / 1e3).toFixed(1)} kSym/s`;
+  return `${symHz.toFixed(0)} Sym/s`;
+}
+
+/**
+ * Auto-scale bandwidth for display (4.2). Fixes "0.000 MHz" bug.
+ */
+export function formatBandwidth(hz: number): string {
+  if (hz >= 1e6) return `${(hz / 1e6).toFixed(3)} MHz`;
+  if (hz >= 1e3) return `${(hz / 1e3).toFixed(1)} kHz`;
+  return `${hz.toFixed(0)} Hz`;
+}
+
+/**
+ * Format file size.
  */
 export function formatFileSize(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
@@ -247,7 +358,7 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * Utility: Format duration.
+ * Format duration.
  */
 export function formatDuration(seconds: number): string {
   if (seconds >= 60) return `${Math.floor(seconds / 60)}m ${(seconds % 60).toFixed(1)}s`;

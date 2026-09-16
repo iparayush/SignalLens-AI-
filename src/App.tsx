@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { NavigationTab, SignalProfile, ModulationType, ProcessingState, PipelineProgressInfo } from './types';
 import { SAMPLE_SIGNALS } from './data/signals';
-import { runPipeline, formatFrequency, formatFileSize, formatDuration, DEFAULT_PIPELINE_CONFIG } from './lib/pipeline';
+import { runPipeline, formatFrequency, formatFileSize, formatDuration, formatSymbolRate, formatBandwidth, DEFAULT_PIPELINE_CONFIG } from './lib/pipeline';
 import type { PipelineResults, PipelineProgress } from './lib/pipeline';
+import { computeThreatLevel } from './lib/threatScorer';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -25,7 +26,7 @@ function mapPipelineToProfile(
   file: File,
   results: PipelineResults
 ): SignalProfile {
-  const { parsed, psd, spectrogram, metrics, classification, demodulation, deinterleave, fec, correlation, totalTimeMs } = results;
+  const { parsed, psd, spectrogram, metrics, classification, demodulation, deinterleave, deinterleaveCandidates, fec, fecCandidates, correlation, totalTimeMs, stagesGated, gatingReason } = results;
 
   const fsHz = parsed.sampleRate;
   const detectedMod = classification.detected as ModulationType;
@@ -35,9 +36,12 @@ function mapPipelineToProfile(
     detectedMod === '2-FSK' || detectedMod === '4-FSK' || detectedMod === 'GMSK' ? 'FSK' :
     'QPSK';
 
-  // Build bitstream lines from decoded data
+  // Build bitstream lines from decoded data (4.12 — label header/payload)
   const bitstreamLines = [];
-  const decodedBytes = fec.data;
+  const decodedBytes = fec.data.length > 0 ? fec.data : demodulation.bits;
+  const frameLengthBytes = correlation.estimatedFrameLengthBytes;
+  const hasSignificantMatch = correlation.hasSignificantMatch;
+
   for (let row = 0; row < Math.min(32, Math.ceil(decodedBytes.length / 16)); row++) {
     const offset = row * 16;
     const hexBytes: string[] = [];
@@ -47,18 +51,28 @@ function mapPipelineToProfile(
       hexBytes.push(byte.toString(16).padStart(2, '0').toUpperCase());
       ascii += (byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : '.';
     }
+
+    // 4.12: Segment labeling — only when sync match is significant
+    let highlightCategory: 'header' | 'ip' | 'protocol' | 'payload' | undefined;
+    if (hasSignificantMatch && row === 0) {
+      highlightCategory = 'header';
+    } else if (hasSignificantMatch && frameLengthBytes && offset <= frameLengthBytes) {
+      highlightCategory = 'payload';
+    }
+
     bitstreamLines.push({
       offset: `0x${offset.toString(16).padStart(4, '0').toUpperCase()}`,
       hexBytes,
       ascii,
-      highlightCategory: row === 0 ? 'header' as const : undefined,
+      highlightCategory,
     });
   }
 
-  // Map correlation results
-  const bestMatch = correlation.matches[0];
+  // Map correlation results (4.4 — significance tracking)
+  const bestMatch = correlation.matches.find(m => m.isSignificant) || correlation.matches[0];
+  const syncMatchLengthBytes = bestMatch?.patternLengthBytes ?? 0;
   const correlationData = {
-    patternName: bestMatch?.patternName || 'Auto-Detected',
+    patternName: bestMatch?.patternName || 'No Pattern',
     syncPreambleHex: bestMatch?.matchedHex || 'N/A',
     detectedPositionOffset: bestMatch ? `Byte ${bestMatch.byteOffset}` : 'No Match',
     bitLocation: bestMatch ? `Bit ${bestMatch.bitOffset}` : 'N/A',
@@ -68,9 +82,21 @@ function mapPipelineToProfile(
     detThresholdDb: -12,
     crossCorrLength: correlation.correlationWaveform.length,
     peakToSidelobeStatus: (correlation.bestPsrDb > 10 ? 'PASS' : correlation.bestPsrDb > 5 ? 'WARN' : 'FAIL') as 'PASS' | 'WARN' | 'FAIL',
+    hasSignificantMatch,
+    syncMatchLengthBytes,
   };
 
-  // Pipeline stages
+  // Threat level — confidence-gated (4.6)
+  const threatLevel = computeThreatLevel({
+    overallConfidence: metrics.overallConfidence,
+    hasSignificantMatch,
+    snrDb: metrics.estimatedSnrDb,
+    modConfidence: classification.confidence,
+    evmRms: demodulation.evmRms,
+    fecUndetermined: fec.undetermined === true,
+  });
+
+  // Pipeline stages — show UNDETERMINED states (4.1)
   const stageTiming = results.stageTiming;
   const pipelineStages = [
     {
@@ -86,7 +112,7 @@ function mapPipelineToProfile(
       statusText: `SNR: +${metrics.estimatedSnrDb.toFixed(1)} dB (${metrics.snrQuality})`,
       isPassed: true, iconName: 'Activity',
       description: `Welch PSD with ${DEFAULT_PIPELINE_CONFIG.fftSize}-point ${DEFAULT_PIPELINE_CONFIG.windowType} FFT`,
-      metaLeft: `BW: ${(metrics.estimatedBandwidthHz / 1e3).toFixed(1)} kHz`,
+      metaLeft: `BW: ${formatBandwidth(metrics.estimatedBandwidthHz)}`,
       metaRight: `${(stageTiming['spectral'] || 0).toFixed(0)} ms`,
     },
     {
@@ -99,21 +125,44 @@ function mapPipelineToProfile(
     },
     {
       id: 'demod', stepNum: '04', title: 'Demodulation',
-      statusText: `${demodulation.numBits} bits recovered`,
+      statusText: demodulation.carrierLocked
+        ? `${demodulation.numBits} bits recovered`
+        : `UNLOCKED — EVM ${demodulation.evmRms.toFixed(1)}% ≥ ${DEFAULT_PIPELINE_CONFIG.thresholds.maxEvmPct}% threshold`,
       isPassed: demodulation.carrierLocked, iconName: 'Radio',
       description: `${demodulation.modulation} demod, EVM: ${demodulation.evmRms.toFixed(1)}%, Phase Jitter: ${demodulation.phaseJitterDeg.toFixed(1)}°`,
       metaLeft: `Carrier ${demodulation.carrierLocked ? 'LOCKED' : 'UNLOCKED'}`,
       metaRight: `${(stageTiming['demodulating'] || 0).toFixed(0)} ms`,
     },
     {
-      id: 'fec', stepNum: '05', title: 'FEC Decode',
-      statusText: `${fec.errorsCorrected} errors corrected`,
-      isPassed: true, iconName: 'Shield',
-      description: fec.config,
-      metaLeft: `Gain: ${fec.codingGainDb.toFixed(1)} dB`,
+      id: 'deinterleave', stepNum: '05', title: 'De-interleaving',
+      statusText: deinterleave.undetermined
+        ? 'UNDETERMINED — upstream gate failed'
+        : `${deinterleave.label} (score ${(deinterleave.score * 100).toFixed(0)}%)`,
+      isPassed: !deinterleave.undetermined, iconName: 'Grid',
+      description: deinterleave.undetermined
+        ? `Not attempted: ${deinterleave.undeterminedReason}`
+        : deinterleave.params,
+      metaLeft: deinterleave.undetermined ? 'N/A' : `Dispersed: ${deinterleave.burstErrorsDispersed}`,
+      metaRight: `${(stageTiming['deinterleaving'] || 0).toFixed(0)} ms`,
+    },
+    {
+      id: 'fec', stepNum: '06', title: 'FEC Decode',
+      statusText: fec.undetermined
+        ? 'UNDETERMINED — upstream gate failed'
+        : `${fec.errorsCorrected} errors corrected`,
+      isPassed: !fec.undetermined, iconName: 'Shield',
+      description: fec.undetermined
+        ? `Not attempted: ${fec.undeterminedReason}`
+        : fec.config,
+      metaLeft: fec.undetermined ? 'N/A' : `Gain: ${fec.codingGainDb.toFixed(1)} dB`,
       metaRight: `${fec.processingTimeMs.toFixed(0)} ms`,
     },
   ];
+
+  // RF Center Frequency vs Residual Carrier Offset (4.3)
+  // parsed.centerFrequencyHz comes from file metadata if present (WAV/SigMF header)
+  const rfCenterFreqHz = (parsed as any).centerFrequencyHz as number | undefined;
+  const residualCarrierOffsetHz = metrics.centerFreqHz;
 
   return {
     id: `computed-${Date.now()}`,
@@ -125,9 +174,9 @@ function mapPipelineToProfile(
     durFormatted: formatDuration(parsed.durationSeconds),
     samplingRateMSps: fsHz / 1e6,
     fsFormatted: formatFrequency(fsHz),
-    centerCarrierMHz: metrics.centerFreqHz / 1e6,
-    fcFormatted: formatFrequency(metrics.centerFreqHz),
-    channel: `CH-${Math.floor(metrics.centerFreqHz / 1e6)}`,
+    centerCarrierMHz: rfCenterFreqHz ? rfCenterFreqHz / 1e6 : residualCarrierOffsetHz / 1e6,
+    fcFormatted: rfCenterFreqHz ? formatFrequency(rfCenterFreqHz) : `${formatFrequency(residualCarrierOffsetHz)} (residual offset)`,
+    channel: rfCenterFreqHz ? `CH-${Math.floor(rfCenterFreqHz / 1e6)}` : 'CH-UNKNOWN',
     formatDescription: `${parsed.sampleFormat.toUpperCase()} ${parsed.bitsPerSample}-bit Complex I/Q`,
     crc32: parsed.crc32,
     telemetry: {
@@ -136,16 +185,22 @@ function mapPipelineToProfile(
       samplingFreqMHz: fsHz / 1e6,
       samplingFreqConfidence: 100,
       symbolRateMSym: metrics.estimatedSymbolRateHz / 1e6,
+      symbolRateHz: metrics.estimatedSymbolRateHz,
       symbolRateConfidence: metrics.symbolRateConfidence,
       bandwidthMHz: metrics.estimatedBandwidthHz / 1e6,
+      bandwidthHz: metrics.estimatedBandwidthHz,
       bandwidthConfidence: metrics.bandwidthConfidence,
-      fecCode: fec.config,
-      fecDetected: true,
-      interleaving: deinterleave.params,
-      interleavingConfidence: 95,
+      fecCode: fec.undetermined ? 'UNDETERMINED' : fec.config,
+      fecDetected: !fec.undetermined,
+      fecUndetermined: fec.undetermined === true,
+      fecUndeterminedReason: fec.undeterminedReason || '',
+      interleaving: deinterleave.undetermined ? 'UNDETERMINED' : deinterleave.params,
+      interleavingConfidence: deinterleave.undetermined ? 0 : Math.round(deinterleave.score * 100),
+      interleavingUndetermined: deinterleave.undetermined === true,
+      interleavingUndeterminedReason: deinterleave.undeterminedReason || '',
       estimatedSnrDb: metrics.estimatedSnrDb,
       snrQuality: metrics.snrQuality,
-      centerCarrierMHz: metrics.centerFreqHz / 1e6,
+      centerCarrierMHz: rfCenterFreqHz ? rfCenterFreqHz / 1e6 : residualCarrierOffsetHz / 1e6,
       carrierLocked: metrics.carrierLocked,
       overallConfidence: metrics.overallConfidence,
       algorithm: 'Cumulant Classifier + Costas Loop DSP',
@@ -161,11 +216,17 @@ function mapPipelineToProfile(
     emitterProfile: {
       callsign: `SIG-${file.name.slice(0, 6).toUpperCase()}`,
       classification: 'SIGINT — Automated Intercept',
-      estimatedLocation: 'Computed from signal analysis',
-      coordinates: [28.6139, 77.2090],
-      threatLevel: metrics.estimatedSnrDb > 15 ? 'High' : metrics.estimatedSnrDb > 8 ? 'Medium' : 'Low',
+      // 4.5 — No geolocation from single-sensor capture
+      locationNote: 'Not determinable from single-sensor capture',
+      estimatedLocation: 'Not determinable from single-sensor capture',
+      coordinates: undefined,
+      threatLevel,
       targetDesignation: `TARGET-${file.name.replace(/\.[^/.]+$/, '').toUpperCase()}`,
     },
+
+    // 4.3 — Separate RF center freq from residual offset
+    rfCenterFreqHz,
+    residualCarrierOffsetHz,
 
     // Real computed data
     isComputed: true,
@@ -176,10 +237,13 @@ function mapPipelineToProfile(
     classificationResult: classification,
     demodulationResult: demodulation,
     deinterleaveResult: deinterleave,
+    deinterleaveCandidates,
     fecResult: fec,
+    fecCandidates,
     correlationResult: correlation,
     pipelineResults: results,
     processingTimeMs: totalTimeMs,
+    pipelineThresholds: results.parsed ? DEFAULT_PIPELINE_CONFIG.thresholds : undefined,
   };
 }
 
@@ -369,4 +433,3 @@ export default function App() {
     </div>
   );
 }
-

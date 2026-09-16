@@ -9,9 +9,23 @@
  */
 
 import { SignalProfile } from '../types';
+import { classificationLabel } from './threatScorer';
 
 function escapePdfText(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function formatHz(hz: number): string {
+  if (hz >= 1e9) return `${(hz / 1e9).toFixed(3)} GHz`;
+  if (hz >= 1e6) return `${(hz / 1e6).toFixed(3)} MHz`;
+  if (hz >= 1e3) return `${(hz / 1e3).toFixed(1)} kHz`;
+  return `${hz.toFixed(0)} Hz`;
+}
+
+function formatSymHz(hz: number): string {
+  if (hz >= 1e6) return `${(hz / 1e6).toFixed(3)} MSym/s`;
+  if (hz >= 1e3) return `${(hz / 1e3).toFixed(1)} kSym/s`;
+  return `${hz.toFixed(0)} Sym/s`;
 }
 
 /**
@@ -22,7 +36,7 @@ export function generateSignalReportPdf(activeSignal: SignalProfile): Blob {
     '================================================================================',
     'NATIONAL TECHNICAL RESEARCH ORGANIZATION (NTRO) - SIGINT REPORT',
     `DOCUMENT ID: NTRO-2026-SIG-${activeSignal.crc32}`,
-    'CLASSIFICATION: TOP SECRET // NOFORN // STRICT COMPARTMENTATION',
+    `CLASSIFICATION: ${classificationLabel(activeSignal.emitterProfile.threatLevel, activeSignal.telemetry.overallConfidence).toUpperCase()}`,
     `GENERATED AT: ${new Date().toISOString()}`,
     `PIPELINE STATUS: ${activeSignal.isComputed ? 'REAL DSP CAPTURE PROCESSED' : 'CALIBRATED EMITTER CAPTURE'}`,
     '================================================================================',
@@ -34,10 +48,10 @@ export function generateSignalReportPdf(activeSignal: SignalProfile): Blob {
     `   Duration:              ${activeSignal.durFormatted} (${activeSignal.sizeFormatted})`,
     `   Modulation Detected:   ${activeSignal.telemetry.modulation} (${activeSignal.telemetry.modulationMatch.toFixed(1)}% Confidence)`,
     `   Signal-to-Noise Ratio: +${activeSignal.telemetry.estimatedSnrDb.toFixed(1)} dB (${activeSignal.telemetry.snrQuality})`,
-    `   Occupied Bandwidth:    ${activeSignal.telemetry.bandwidthMHz.toFixed(3)} MHz`,
-    `   Symbol Rate:           ${activeSignal.telemetry.symbolRateMSym.toFixed(3)} MSym/s`,
-    `   FEC Code:              ${activeSignal.telemetry.fecCode}`,
-    `   Interleaving Scheme:   ${activeSignal.telemetry.interleaving}`,
+    `   Occupied Bandwidth:    ${activeSignal.telemetry.bandwidthHz ? formatHz(activeSignal.telemetry.bandwidthHz) : activeSignal.telemetry.bandwidthMHz.toFixed(3) + ' MHz'}`,
+    `   Symbol Rate:           ${activeSignal.telemetry.symbolRateHz ? formatSymHz(activeSignal.telemetry.symbolRateHz) : activeSignal.telemetry.symbolRateMSym.toFixed(3) + ' MSym/s'}`,
+    `   FEC Code:              ${activeSignal.telemetry.fecUndetermined ? 'UNDETERMINED — upstream gate failed' : activeSignal.telemetry.fecCode}`,
+    `   Interleaving Scheme:   ${activeSignal.telemetry.interleavingUndetermined ? 'UNDETERMINED — upstream gate failed' : activeSignal.telemetry.interleaving}`,
     `   EVM RMS:               ${activeSignal.evmRms.toFixed(1)}%`,
     `   Phase Jitter:          +/-${activeSignal.phaseJitterDeg.toFixed(1)} deg RMS`,
     `   Processing Latency:    ${(activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs).toFixed(1)} ms`,
@@ -46,9 +60,11 @@ export function generateSignalReportPdf(activeSignal: SignalProfile): Blob {
     `   Target Designation:    ${activeSignal.emitterProfile.targetDesignation}`,
     `   Callsign / ID:         ${activeSignal.emitterProfile.callsign}`,
     `   Emitter Classification:${activeSignal.emitterProfile.classification}`,
-    `   Estimated Location:    ${activeSignal.emitterProfile.estimatedLocation}`,
-    `   Coordinates:           ${activeSignal.emitterProfile.coordinates[0].toFixed(4)} N, ${activeSignal.emitterProfile.coordinates[1].toFixed(4)} E`,
-    `   Threat Level:          ${activeSignal.emitterProfile.threatLevel} (CRITICAL PRIORITY)`,
+    `   Location Note:         ${activeSignal.emitterProfile.locationNote || activeSignal.emitterProfile.estimatedLocation}`,
+    `   Geolocation:           ${activeSignal.emitterProfile.coordinates
+      ? `${activeSignal.emitterProfile.coordinates[0].toFixed(4)} N, ${activeSignal.emitterProfile.coordinates[1].toFixed(4)} E (multi-sensor fix)`
+      : 'Not determinable from single-sensor capture'}`,
+    `   Threat Level:          ${activeSignal.emitterProfile.threatLevel} (confidence-gated)`,
     '',
     '3. SYNC PREAMBLE & CORRELATION',
     `   Pattern Name:          ${activeSignal.correlation.patternName}`,
