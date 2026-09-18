@@ -193,13 +193,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
 
-                <button
-                  onClick={handleOpenWebsite}
-                  className="px-6 py-3.5 text-base font-semibold text-slate-200 bg-slate-900/80 border border-slate-700 hover:border-cyan-400/60 rounded-xl transition-all flex items-center gap-2 hover:bg-slate-800 active:scale-95 font-headline"
-                >
-                  <span>Open Website</span>
-                  <ExternalLink className="w-4 h-4 text-slate-400" />
-                </button>
+
               </div>
 
               {/* Interactive In-Hero Quick Dropzone */}
