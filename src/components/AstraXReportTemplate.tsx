@@ -43,9 +43,9 @@ export const AstraXReportTemplate: React.FC<AstraXReportTemplateProps> = ({
     analysisStatus: activeSignal ? (activeSignal.isComputed ? 'COMPUTED & VERIFIED' : 'CALIBRATED') : '{{analysis_status}}',
     patternName: activeSignal ? activeSignal.correlation.patternName : '{{pattern_name}}',
     preambleHex: activeSignal ? activeSignal.correlation.syncPreambleHex : '{{preamble_hex}}',
-    matchedOffset: activeSignal ? activeSignal.correlation.detectedPositionOffset : '{{matched_offset}}',
+    matchedOffset: activeSignal ? activeSignal.correlation.detectedPositionOffset : '{{frame_offset}}',
     psr: activeSignal ? `${activeSignal.correlation.crossCorrPsrDb.toFixed(1)} dB (${activeSignal.correlation.peakToSidelobeStatus})` : '{{psr}}',
-    syncStatus: activeSignal ? (activeSignal.correlation.hasSignificantMatch ? 'LOCKED & VERIFIED' : 'SEARCHING') : '{{sync_status}}',
+    syncStatus: activeSignal ? (activeSignal.correlation.hasSignificantMatch ? 'LOCKED & VERIFIED' : 'SEARCHING') : '{{status}}',
     confidence: activeSignal ? activeSignal.telemetry.overallConfidence.toFixed(1) : '',
     summaryText: activeSignal ? `Automated DSP extraction completed across ${activeSignal.durFormatted} of complex I/Q capture. Detected carrier centered with ${activeSignal.telemetry.modulation} modulation scheme at ${activeSignal.telemetry.overallConfidence.toFixed(1)}% confidence.` : 'Automated analysis summary will appear here.',
     findings: [
@@ -269,21 +269,21 @@ CLASSIFICATION: ${fields.classification}
               <div className="flex flex-col">
                 <span className="text-slate-300 font-bold uppercase text-[8px] tracking-wider">DOCUMENT ID</span>
                 <div className="w-28 border-b border-white pb-0.5 mt-0.5 text-center font-bold text-white text-[9px]">
-                  {isTemplate ? '' : fields.docId}
+                  {isTemplate ? '{{document_id}}' : fields.docId}
                 </div>
               </div>
 
               <div className="flex flex-col">
                 <span className="text-slate-300 font-bold uppercase text-[8px] tracking-wider">DATE</span>
                 <div className="w-24 border-b border-white pb-0.5 mt-0.5 text-center font-bold text-white text-[9px]">
-                  {isTemplate ? '' : fields.date}
+                  {isTemplate ? '{{date}}' : fields.date}
                 </div>
               </div>
 
               <div className="flex flex-col">
                 <span className="text-slate-300 font-bold uppercase text-[8px] tracking-wider">CLASSIFICATION</span>
                 <div className="w-28 border-b border-white pb-0.5 mt-0.5 text-center font-bold text-white text-[9px]">
-                  {isTemplate ? '' : fields.classification}
+                  {isTemplate ? '{{classification}}' : fields.classification}
                 </div>
               </div>
             </div>
@@ -306,19 +306,19 @@ CLASSIFICATION: ${fields.classification}
 
                 <div className="border border-[#D6DDE5] rounded-sm overflow-hidden text-[9px]">
                   {[
-                    { label: 'File Name', val: fields.fileName },
-                    { label: 'File Format (IQ / WAV)', val: fields.fileFormat },
-                    { label: 'File Size', val: fields.fileSize },
-                    { label: 'Duration', val: fields.duration },
-                    { label: 'Sampling Rate (Fs)', val: fields.samplingRate },
-                    { label: 'Center Frequency (Fc)', val: fields.centerFrequency },
-                    { label: 'Modulation (Estimated)', val: fields.modulation },
-                    { label: 'Signal-to-Noise Ratio (SNR)', val: fields.snr },
-                    { label: 'Occupied Bandwidth', val: fields.bandwidth },
-                    { label: 'Symbol Rate', val: fields.symbolRate },
-                    { label: 'FEC (Estimated)', val: fields.fec },
-                    { label: 'Interleaving (Estimated)', val: fields.interleaving },
-                    { label: 'Processing Time', val: fields.processingTime },
+                    { label: 'File Name', val: fields.fileName, tpl: '{{file_name}}' },
+                    { label: 'File Format (IQ / WAV)', val: fields.fileFormat, tpl: '{{file_format}}' },
+                    { label: 'File Size', val: fields.fileSize, tpl: '{{file_size}}' },
+                    { label: 'Duration', val: fields.duration, tpl: '{{duration}}' },
+                    { label: 'Sampling Rate (Fs)', val: fields.samplingRate, tpl: '{{sampling_rate}}' },
+                    { label: 'Center Frequency (Fc)', val: fields.centerFrequency, tpl: '{{center_frequency}}' },
+                    { label: 'Modulation (Estimated)', val: fields.modulation, tpl: '{{modulation}}' },
+                    { label: 'Signal-to-Noise Ratio (SNR)', val: fields.snr, tpl: '{{snr}}' },
+                    { label: 'Occupied Bandwidth', val: fields.bandwidth, tpl: '{{bandwidth}}' },
+                    { label: 'Symbol Rate', val: fields.symbolRate, tpl: '{{symbol_rate}}' },
+                    { label: 'FEC (Estimated)', val: fields.fec, tpl: '{{fec}}' },
+                    { label: 'Interleaving (Estimated)', val: fields.interleaving, tpl: '{{interleaving}}' },
+                    { label: 'Processing Time', val: fields.processingTime, tpl: '{{processing_time}}' },
                   ].map((row, idx) => (
                     <div
                       key={row.label}
@@ -330,7 +330,7 @@ CLASSIFICATION: ${fields.classification}
                         {row.label}
                       </div>
                       <div className="col-span-7 px-2 py-0.5 bg-white text-[#17202A] font-mono truncate min-h-[17px]">
-                        {isTemplate ? '' : row.val}
+                        {isTemplate ? row.tpl : row.val}
                       </div>
                     </div>
                   ))}
@@ -350,19 +350,19 @@ CLASSIFICATION: ${fields.classification}
 
                 <div className="border border-[#D6DDE5] rounded-sm overflow-hidden text-[9px]">
                   {[
-                    { label: 'Target Designation', val: fields.targetDesignation },
-                    { label: 'Callsign / ID', val: fields.callsign },
-                    { label: 'Emitter Classification', val: fields.emitterClass },
-                    { label: 'Estimated Location', val: fields.estimatedLocation },
-                    { label: 'Coordinates', val: fields.coordinates },
-                    { label: 'Analysis Status', val: fields.analysisStatus },
+                    { label: 'Target Designation', val: fields.targetDesignation, tpl: '{{target_designation}}' },
+                    { label: 'Callsign / ID', val: fields.callsign, tpl: '{{callsign}}' },
+                    { label: 'Emitter Classification', val: fields.emitterClass, tpl: '{{emitter_classification}}' },
+                    { label: 'Estimated Location', val: fields.estimatedLocation, tpl: '{{estimated_location}}' },
+                    { label: 'Coordinates', val: fields.coordinates, tpl: '{{coordinates}}' },
+                    { label: 'Analysis Status', val: fields.analysisStatus, tpl: '{{analysis_status}}' },
                   ].map((row) => (
                     <div key={row.label} className="grid grid-cols-12 border-b border-[#D6DDE5] last:border-b-0">
                       <div className="col-span-5 bg-[#F2F4F6] text-[#17202A] font-medium px-2 py-0.5 border-r border-[#D6DDE5] truncate">
                         {row.label}
                       </div>
                       <div className="col-span-7 px-2 py-0.5 bg-white text-[#17202A] font-mono truncate min-h-[17px]">
-                        {isTemplate ? '' : row.val}
+                        {isTemplate ? row.tpl : row.val}
                       </div>
                     </div>
                   ))}
@@ -382,18 +382,18 @@ CLASSIFICATION: ${fields.classification}
 
                 <div className="border border-[#D6DDE5] rounded-sm overflow-hidden text-[9px]">
                   {[
-                    { label: 'Pattern Name', val: fields.patternName },
-                    { label: 'Preamble (Hex)', val: fields.preambleHex },
-                    { label: 'Matched Frame Offset', val: fields.matchedOffset },
-                    { label: 'Peak-to-Sidelobe Ratio (PSR)', val: fields.psr },
-                    { label: 'Status', val: fields.syncStatus },
+                    { label: 'Pattern Name', val: fields.patternName, tpl: '{{pattern_name}}' },
+                    { label: 'Preamble (Hex)', val: fields.preambleHex, tpl: '{{preamble_hex}}' },
+                    { label: 'Matched Frame Offset', val: fields.matchedOffset, tpl: '{{frame_offset}}' },
+                    { label: 'Peak-to-Sidelobe Ratio (PSR)', val: fields.psr, tpl: '{{psr}}' },
+                    { label: 'Status', val: fields.syncStatus, tpl: '{{status}}' },
                   ].map((row) => (
                     <div key={row.label} className="grid grid-cols-12 border-b border-[#D6DDE5] last:border-b-0">
                       <div className="col-span-6 bg-[#F2F4F6] text-[#17202A] font-medium px-2 py-0.5 border-r border-[#D6DDE5] truncate">
                         {row.label}
                       </div>
                       <div className="col-span-6 px-2 py-0.5 bg-white text-[#17202A] font-mono truncate min-h-[17px]">
-                        {isTemplate ? '' : row.val}
+                        {isTemplate ? row.tpl : row.val}
                       </div>
                     </div>
                   ))}
@@ -433,6 +433,7 @@ CLASSIFICATION: ${fields.classification}
                   </div>
 
                   {/* Empty Grid Interior (or populated waveform if active) */}
+                  {isTemplate && <div className="absolute inset-0 flex items-center justify-center font-mono text-sm text-slate-400 z-20">{'{{chart_2}}'}</div>}
                   <div className="ml-7 mr-2 h-16 border border-[#E2E8F0] relative overflow-hidden bg-white">
                     {/* Light Grid Pattern */}
                     <div
@@ -504,6 +505,7 @@ CLASSIFICATION: ${fields.classification}
                   </div>
 
                   {/* Empty Grid Interior */}
+                  {isTemplate && <div className="absolute inset-0 flex items-center justify-center font-mono text-sm text-slate-400 z-20">{'{{chart_3}}'}</div>}
                   <div className="ml-7 mr-2 h-16 border border-[#E2E8F0] relative overflow-hidden bg-white">
                     <div
                       className="absolute inset-0"
@@ -552,6 +554,7 @@ CLASSIFICATION: ${fields.classification}
 
                 <div className="grid grid-cols-12 gap-2">
                   {/* Left: Square Constellation Plot */}
+                  {isTemplate && <div className="absolute inset-0 flex items-center justify-center font-mono text-sm text-slate-400 z-20 pointer-events-none">{'{{chart_5}}'}</div>}
                   <div className="col-span-7 h-24 border border-[#D6DDE5] rounded-sm relative bg-white flex items-center justify-center">
                     {/* Y-axis (Q) ticks */}
                     <div className="absolute left-1 top-0 bottom-1 flex flex-col justify-between text-[7px] font-mono text-slate-500">
@@ -585,7 +588,7 @@ CLASSIFICATION: ${fields.classification}
                         Detected Modulation
                       </span>
                       <div className="w-full h-6 border border-[#D6DDE5] rounded-sm bg-white mt-1 px-2 flex items-center font-mono font-bold text-[#082A4A] text-[9.5px]">
-                        {isTemplate ? '' : fields.modulation}
+                        {isTemplate ? '{{modulation}}' : fields.modulation}
                       </div>
                     </div>
 
@@ -624,6 +627,7 @@ CLASSIFICATION: ${fields.classification}
                   </div>
 
                   {/* Chart Body */}
+                  {isTemplate && <div className="absolute inset-0 flex items-center justify-center font-mono text-sm text-slate-400 z-20 pointer-events-none">{'{{chart_7}}'}</div>}
                   <div className="ml-6 mr-14 h-16 w-full border border-[#E2E8F0] relative overflow-hidden bg-white">
                     {!isTemplate && (
                       <div className="w-full h-full bg-gradient-to-b from-[#082A4A] via-[#1677D2] to-[#EAF4FC] opacity-90 flex items-center justify-center">
@@ -682,7 +686,7 @@ CLASSIFICATION: ${fields.classification}
 
             <div className="h-10 border border-[#D6DDE5] rounded-sm bg-white px-2.5 py-1 font-mono text-[9px] text-[#4B6584] flex items-center">
               {isTemplate ? (
-                <span className="italic text-slate-400">Bitstream data will appear here...</span>
+                <span className="text-slate-400">{'{{bitstream}}'}</span>
               ) : (
                 <span className="text-[#082A4A] font-semibold truncate">
                   0x0000: 1A CF FC 1D 00 24 5A 89 42 01 FF 8B 3C A7 09 E2  [...$Z.B...&lt;...]
@@ -705,9 +709,7 @@ CLASSIFICATION: ${fields.classification}
               </div>
               <div className="h-16 border border-[#D6DDE5] rounded-sm bg-white p-2 text-[9px] leading-relaxed text-[#4B6584]">
                 {isTemplate ? (
-                  <span className="italic text-slate-400">
-                    Automated analysis summary will appear here.
-                  </span>
+                  <span className="text-slate-400">{'{{analysis_summary}}'}</span>
                 ) : (
                   <span>{fields.summaryText}</span>
                 )}
@@ -729,7 +731,7 @@ CLASSIFICATION: ${fields.classification}
                   <div key={i} className="flex items-center gap-2">
                     <span className="text-[#1677D2] text-[10px] leading-none">○</span>
                     {isTemplate ? (
-                      <div className="w-full h-[1px] bg-[#E2E8F0] mt-1" />
+                      <span className="text-[#17202A] text-[8.5px] truncate">{`{{key_finding_${i + 1}}}`}</span>
                     ) : (
                       <span className="text-[#17202A] text-[8.5px] truncate">
                         {fields.findings[i] || '________________________________________________'}
