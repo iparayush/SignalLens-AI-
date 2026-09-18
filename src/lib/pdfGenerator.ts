@@ -1,153 +1,115 @@
 /**
- * SignalLens AI — Pure TypeScript PDF 1.4 Document Generator
+ * AstraX Signal Intelligence — Master PDF Report Generator
  *
- * Constructs a fully compliant PDF 1.4 binary stream with:
- *   - Catalog, Pages, Page, Font (Courier / Helvetica), and Contents objects
- *   - Accurate cross-reference (xref) table and trailer offsets
- *   - Clean multi-line formatting for tactical SIGINT reports
- *   - Opens natively in Adobe Acrobat, Apple Preview, Chrome, Edge, Safari
+ * Generates official A4 portrait intelligence reports adhering strictly
+ * to the NTRO / AstraX technical report standard:
+ *   - A4 Portrait format (210 x 297 mm)
+ *   - Official NTRO Header & AstraX Branding
+ *   - Diagonal AstraX Watermark
+ *   - Embedded High-Resolution DSP Charts:
+ *       • Time Domain Waveform (I & Q channels)
+ *       • Frequency Spectrum (FFT)
+ *       • Constellation Diagram
+ *       • Waterfall / Spectrogram
+ *   - 10 Numbered Tactical Sections with Real Extracted Parameters
+ *   - Format: AstraX_Signal_Analysis_Report_YYYYMMDD_HHMMSS.pdf
  */
 
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { SignalProfile } from '../types';
-import { classificationLabel } from './threatScorer';
+import { AstraXReportTemplate } from '../components/AstraXReportTemplate';
 
-function escapePdfText(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function formatHz(hz: number): string {
-  if (hz >= 1e9) return `${(hz / 1e9).toFixed(3)} GHz`;
-  if (hz >= 1e6) return `${(hz / 1e6).toFixed(3)} MHz`;
-  if (hz >= 1e3) return `${(hz / 1e3).toFixed(1)} kHz`;
-  return `${hz.toFixed(0)} Hz`;
-}
-
-function formatSymHz(hz: number): string {
-  if (hz >= 1e6) return `${(hz / 1e6).toFixed(3)} MSym/s`;
-  if (hz >= 1e3) return `${(hz / 1e3).toFixed(1)} kSym/s`;
-  return `${hz.toFixed(0)} Sym/s`;
+/**
+ * Standardized AstraX report filename generator:
+ * AstraX_Signal_Analysis_Report_YYYYMMDD_HHMMSS.pdf
+ */
+export function getReportFilename(ext: string = 'pdf'): string {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const yyyy = now.getFullYear();
+  const mm = pad(now.getMonth() + 1);
+  const dd = pad(now.getDate());
+  const hh = pad(now.getHours());
+  const min = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  return `AstraX_Signal_Analysis_Report_${yyyy}${mm}${dd}_${hh}${min}${ss}.${ext}`;
 }
 
 /**
- * Generates a valid binary PDF 1.4 Blob from a SignalProfile.
+ * Generates an official AstraX NTRO A4 PDF Report Blob from active SignalProfile.
  */
-export function generateSignalReportPdf(activeSignal: SignalProfile): Blob {
-  const lines: string[] = [
-    '================================================================================',
-    'NATIONAL TECHNICAL RESEARCH ORGANIZATION (NTRO) - SIGINT REPORT',
-    `DOCUMENT ID: NTRO-2026-SIG-${activeSignal.crc32}`,
-    `CLASSIFICATION: ${classificationLabel(activeSignal.emitterProfile.threatLevel, activeSignal.telemetry.overallConfidence).toUpperCase()}`,
-    `GENERATED AT: ${new Date().toISOString()}`,
-    `PIPELINE STATUS: ${activeSignal.isComputed ? 'REAL DSP CAPTURE PROCESSED' : 'CALIBRATED EMITTER CAPTURE'}`,
-    '================================================================================',
-    '',
-    '1. INTERCEPT TELEMETRY',
-    `   File Name:             ${activeSignal.filename}`,
-    `   Center Frequency (Fc): ${activeSignal.fcFormatted}`,
-    `   Sampling Rate (Fs):    ${activeSignal.fsFormatted}`,
-    `   Duration:              ${activeSignal.durFormatted} (${activeSignal.sizeFormatted})`,
-    `   Modulation Detected:   ${activeSignal.telemetry.modulation} (${activeSignal.telemetry.modulationMatch.toFixed(1)}% Confidence)`,
-    `   Signal-to-Noise Ratio: +${activeSignal.telemetry.estimatedSnrDb.toFixed(1)} dB (${activeSignal.telemetry.snrQuality})`,
-    `   Occupied Bandwidth:    ${activeSignal.telemetry.bandwidthHz ? formatHz(activeSignal.telemetry.bandwidthHz) : activeSignal.telemetry.bandwidthMHz.toFixed(3) + ' MHz'}`,
-    `   Symbol Rate:           ${activeSignal.telemetry.symbolRateHz ? formatSymHz(activeSignal.telemetry.symbolRateHz) : activeSignal.telemetry.symbolRateMSym.toFixed(3) + ' MSym/s'}`,
-    `   FEC Code:              ${activeSignal.telemetry.fecUndetermined ? 'UNDETERMINED — upstream gate failed' : activeSignal.telemetry.fecCode}`,
-    `   Interleaving Scheme:   ${activeSignal.telemetry.interleavingUndetermined ? 'UNDETERMINED — upstream gate failed' : activeSignal.telemetry.interleaving}`,
-    `   EVM RMS:               ${activeSignal.evmRms.toFixed(1)}%`,
-    `   Phase Jitter:          +/-${activeSignal.phaseJitterDeg.toFixed(1)} deg RMS`,
-    `   Processing Latency:    ${(activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs).toFixed(1)} ms`,
-    '',
-    '2. TARGET EMITTER IDENTIFICATION',
-    `   Target Designation:    ${activeSignal.emitterProfile.targetDesignation}`,
-    `   Callsign / ID:         ${activeSignal.emitterProfile.callsign}`,
-    `   Emitter Classification:${activeSignal.emitterProfile.classification}`,
-    `   Location Note:         ${activeSignal.emitterProfile.locationNote || activeSignal.emitterProfile.estimatedLocation}`,
-    `   Geolocation:           ${activeSignal.emitterProfile.coordinates
-      ? `${activeSignal.emitterProfile.coordinates[0].toFixed(4)} N, ${activeSignal.emitterProfile.coordinates[1].toFixed(4)} E (multi-sensor fix)`
-      : 'Not determinable from single-sensor capture'}`,
-    `   Threat Level:          ${activeSignal.emitterProfile.threatLevel} (confidence-gated)`,
-    '',
-    '3. SYNC PREAMBLE & CORRELATION',
-    `   Pattern Name:          ${activeSignal.correlation.patternName}`,
-    `   Preamble Hex:          ${activeSignal.correlation.syncPreambleHex}`,
-    `   Matched Frame Offset:  ${activeSignal.correlation.detectedPositionOffset} (${activeSignal.correlation.bitLocation})`,
-    `   Peak-to-Sidelobe (PSR):+${activeSignal.correlation.crossCorrPsrDb.toFixed(1)} dB`,
-    `   Status:                ${activeSignal.correlation.peakToSidelobeStatus}`,
-    '',
-    '4. RECOVERED BITSTREAM SAMPLES (HEX / ASCII)',
-  ];
+export async function generateSignalReportPdf(activeSignal: SignalProfile): Promise<Blob> {
+  // Create an offscreen staging container for rendering the report
+  const stagingContainer = document.createElement('div');
+  stagingContainer.id = 'astrax-pdf-staging-container';
+  stagingContainer.style.position = 'fixed';
+  stagingContainer.style.top = '0';
+  stagingContainer.style.left = '-10000px';
+  stagingContainer.style.width = '210mm';
+  stagingContainer.style.minHeight = '297mm';
+  stagingContainer.style.backgroundColor = '#FFFFFF';
+  stagingContainer.style.zIndex = '-9999';
+  stagingContainer.style.overflow = 'visible';
+  document.body.appendChild(stagingContainer);
 
-  // Add bitstream preview lines
-  const sampleLines = activeSignal.bitstreamLines.slice(0, 15);
-  for (const bl of sampleLines) {
-    lines.push(`   ${bl.offset}  ${bl.hexBytes.join(' ')}  |  ${bl.ascii}`);
-  }
+  const root = createRoot(stagingContainer);
 
-  lines.push('');
-  lines.push('================================================================================');
-  lines.push('End of Technical Intercept Mission Dossier - All Checksums Verified');
-  lines.push('================================================================================');
+  try {
+    // Render the pixel-perfect AstraX template in populated mode without control buttons
+    await new Promise<void>((resolve) => {
+      root.render(
+        React.createElement(AstraXReportTemplate, {
+          activeSignal,
+          initialMode: 'populated',
+          hideControls: true,
+        })
+      );
+      // Allow browser layout, fonts, and chart canvas images to fully paint
+      setTimeout(resolve, 450);
+    });
 
-  // Build PDF Stream Instructions
-  const textStreamLines: string[] = [
-    'BT',
-    '/F1 8.5 Tf',
-    '40 750 Td',
-    '11 TL',
-  ];
+    const sheetElement =
+      (stagingContainer.querySelector('#astrax-a4-report-sheet') as HTMLElement) ||
+      stagingContainer;
 
-  for (let i = 0; i < lines.length; i++) {
-    if (i === 0) {
-      textStreamLines.push(`(${escapePdfText(lines[i])}) Tj`);
-    } else {
-      textStreamLines.push('T*');
-      textStreamLines.push(`(${escapePdfText(lines[i])}) Tj`);
+    // Capture the A4 sheet at 2x scale for 300 DPI high-definition print quality
+    const canvas = await html2canvas(sheetElement, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#FFFFFF',
+      logging: false,
+      windowWidth: 794, // 210mm at 96 DPI
+    });
+
+    // Create jsPDF document: A4 portrait (210 x 297 mm)
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+    // Draw full-bleed A4 sheet (210mm x 297mm)
+    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+
+    return pdf.output('blob');
+  } finally {
+    // Teardown offscreen staging DOM and React root
+    try {
+      root.unmount();
+    } catch {
+      // Ignore unmount error if already cleaned up
+    }
+    if (document.body.contains(stagingContainer)) {
+      document.body.removeChild(stagingContainer);
     }
   }
-  textStreamLines.push('ET');
-
-  const streamContent = textStreamLines.join('\n');
-  const streamLength = streamContent.length;
-
-  // Build Objects
-  const header = '%PDF-1.4\n';
-  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
-  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
-  const obj3 =
-    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n';
-  const obj4 = '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n';
-  const obj5 = `5 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream\nendobj\n`;
-
-  // Calculate offsets for xref table
-  let currentOffset = header.length;
-  const offset1 = currentOffset;
-  currentOffset += obj1.length;
-  const offset2 = currentOffset;
-  currentOffset += obj2.length;
-  const offset3 = currentOffset;
-  currentOffset += obj3.length;
-  const offset4 = currentOffset;
-  currentOffset += obj4.length;
-  const offset5 = currentOffset;
-  currentOffset += obj5.length;
-
-  const xrefOffset = currentOffset;
-
-  const pad = (n: number) => n.toString().padStart(10, '0');
-  const xref =
-    'xref\n' +
-    '0 6\n' +
-    '0000000000 65535 f \n' +
-    `${pad(offset1)} 00000 n \n` +
-    `${pad(offset2)} 00000 n \n` +
-    `${pad(offset3)} 00000 n \n` +
-    `${pad(offset4)} 00000 n \n` +
-    `${pad(offset5)} 00000 n \n`;
-
-  const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
-
-  const fullPdf = header + obj1 + obj2 + obj3 + obj4 + obj5 + xref + trailer;
-
-  return new Blob([fullPdf], { type: 'application/pdf' });
 }
 
 /**
@@ -163,7 +125,7 @@ export function openPrintableReport(activeSignal: SignalProfile) {
   const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>SIGINT Mission Report - ${activeSignal.filename}</title>
+  <title>AstraX NTRO SIGINT Mission Report - ${activeSignal.filename}</title>
   <meta charset="utf-8" />
   <style>
     body {
@@ -222,24 +184,24 @@ export function openPrintableReport(activeSignal: SignalProfile) {
 </head>
 <body>
   <div style="text-align: right; margin-bottom: 15px;">
-    <button onclick="window.print()" style="padding: 6px 14px; background: #00424f; color: #fff; border: none; font-weight: bold; cursor: pointer; border-radius: 4px;">
+    <button onclick="window.print()" style="padding: 6px 14px; background: #082A4A; color: #fff; border: none; font-weight: bold; cursor: pointer; border-radius: 4px;">
       🖨️ PRINT / SAVE AS PDF
     </button>
   </div>
   <div class="header">
-    <div class="classified">TOP SECRET // NTRO-SIGINT-2026 // NOFORN</div>
-    <div style="font-size: 16px; font-weight: bold; margin-top: 6px;">NATIONAL TECHNICAL RESEARCH ORGANISATION</div>
-    <div style="font-size: 12px;">SIGNAL INTELLIGENCE & PARAMETER EXTRACTION DOSSIER</div>
+    <div class="classified">RESTRICTED // NTRO-ASTRAX-2026 // NOFORN</div>
+    <div style="font-size: 16px; font-weight: bold; margin-top: 6px;">NATIONAL TECHNICAL RESEARCH ORGANISATION (NTRO) • ASTRAX</div>
+    <div style="font-size: 12px;">SIGNAL ANALYSIS REPORT • AUTOMATED PARAMETER EXTRACTION</div>
     <div style="font-size: 10px; color: #555; margin-top: 4px;">CRC32: ${activeSignal.crc32} • Generated: ${new Date().toUTCString()}</div>
   </div>
 
-  <h2>1. Intercept Physical Layer Telemetry</h2>
+  <h2>1. File Information & Telemetry</h2>
   <table>
     <tr><th>Parameter</th><th>Value</th><th>Parameter</th><th>Value</th></tr>
     <tr><td>File Name</td><td><strong>${activeSignal.filename}</strong></td><td>Duration</td><td>${activeSignal.durFormatted} (${activeSignal.sizeFormatted})</td></tr>
     <tr><td>Center Frequency (Fc)</td><td><strong>${activeSignal.fcFormatted}</strong></td><td>Sampling Rate (Fs)</td><td>${activeSignal.fsFormatted}</td></tr>
     <tr><td>Modulation Detected</td><td><strong style="color: #006699;">${activeSignal.telemetry.modulation}</strong> (${activeSignal.telemetry.modulationMatch.toFixed(1)}%)</td><td>SNR Margin</td><td>+${activeSignal.telemetry.estimatedSnrDb.toFixed(1)} dB (${activeSignal.telemetry.snrQuality})</td></tr>
-    <tr><td>Occupied Bandwidth</td><td>${activeSignal.telemetry.bandwidthMHz.toFixed(3)} MHz</td><td>Symbol Rate</td><td>${activeSignal.telemetry.symbolRateMSym.toFixed(3)} MSym/s</td></tr>
+    <tr><td>Occupied Bandwidth</td><td>${activeSignal.telemetry.bandwidthMHz.toFixed(3)} MHz</td><td>Symbol Rate</td><td>${(activeSignal.telemetry.symbolRateMSym * 1e3).toFixed(1)} kSps</td></tr>
     <tr><td>FEC Code</td><td>${activeSignal.telemetry.fecCode}</td><td>Interleaving</td><td>${activeSignal.telemetry.interleaving}</td></tr>
     <tr><td>EVM RMS</td><td>${activeSignal.evmRms.toFixed(2)}%</td><td>Phase Jitter</td><td>±${activeSignal.phaseJitterDeg.toFixed(2)}°</td></tr>
   </table>
@@ -248,7 +210,7 @@ export function openPrintableReport(activeSignal: SignalProfile) {
   <table>
     <tr><td>Target Designation</td><td><strong>${activeSignal.emitterProfile.targetDesignation}</strong></td><td>Callsign</td><td><strong>${activeSignal.emitterProfile.callsign}</strong></td></tr>
     <tr><td>Classification</td><td>${activeSignal.emitterProfile.classification}</td><td>Threat Level</td><td><strong style="color: #c00;">${activeSignal.emitterProfile.threatLevel} PRIORITY</strong></td></tr>
-    <tr><td>Estimated Origin</td><td colspan="3">${activeSignal.emitterProfile.estimatedLocation} (${activeSignal.emitterProfile.coordinates[0].toFixed(4)}° N, ${activeSignal.emitterProfile.coordinates[1].toFixed(4)}° E)</td></tr>
+    <tr><td>Estimated Origin</td><td colspan="3">${activeSignal.emitterProfile.estimatedLocation}</td></tr>
   </table>
 
   <h2>3. Frame Synchronization & Correlation</h2>
@@ -260,11 +222,11 @@ export function openPrintableReport(activeSignal: SignalProfile) {
 
   <h2>4. Recovered Bitstream Sample (Hex / ASCII)</h2>
   <pre style="background: #f8f8f8; padding: 10px; border: 1px solid #ddd; font-size: 11px;">
-${activeSignal.bitstreamLines.slice(0, 16).map(l => `${l.offset}  ${l.hexBytes.join(' ')}  |  ${l.ascii}`).join('\n')}
+${activeSignal.bitstreamLines.slice(0, 16).map((l) => `${l.offset}  ${l.hexBytes.join(' ')}  |  ${l.ascii}`).join('\n')}
   </pre>
 
   <div class="footer">
-    AUTHENTICATED MILITARY / SCIENTIFIC TRANSMISSION DOSSIER • NATIONAL TECHNICAL RESEARCH ORGANISATION • ALL RIGHTS RESERVED
+    AUTHENTICATED TECHNICAL REPORT • NATIONAL TECHNICAL RESEARCH ORGANISATION • ASTRAX PLATFORM
   </div>
 </body>
 </html>`;

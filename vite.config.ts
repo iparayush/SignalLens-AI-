@@ -9,6 +9,7 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        canvg: path.resolve(__dirname, 'src/lib/canvg-stub.ts'),
       },
     },
     server: {

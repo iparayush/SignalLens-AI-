@@ -354,6 +354,10 @@ export default function App() {
             setActiveTab('landing');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onNavigateReports={() => {
+            setActiveTab('reports');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
 
         {/* Pipeline Processing Progress Bar */}

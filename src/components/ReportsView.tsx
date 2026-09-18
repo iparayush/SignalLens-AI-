@@ -12,7 +12,7 @@ import {
   FileCode,
   Layers,
 } from 'lucide-react';
-import { generateSignalReportPdf, openPrintableReport } from '../lib/pdfGenerator';
+import { generateSignalReportPdf, getReportFilename, openPrintableReport } from '../lib/pdfGenerator';
 import { AstraXReportTemplate } from './AstraXReportTemplate';
 
 interface ReportsViewProps {
@@ -22,19 +22,30 @@ interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenExportModal }) => {
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const [reportViewMode, setReportViewMode] = useState<'astrax-template' | 'dossier'>('astrax-template');
 
-  const handleDownloadDirect = (format: 'pdf' | 'json' | 'csv') => {
-    const baseName = activeSignal.filename.replace(/\.[^/.]+$/, '');
-    const filename = `${baseName}_SIGINT_REPORT.${format}`;
+  const handleDownloadDirect = async (format: 'pdf' | 'json' | 'csv') => {
+    const filename = getReportFilename(format);
     let blob: Blob;
 
     if (format === 'pdf') {
-      blob = generateSignalReportPdf(activeSignal);
+      setIsPdfGenerating(true);
+      try {
+        blob = await generateSignalReportPdf(activeSignal);
+      } catch (err) {
+        console.error('Failed to generate PDF:', err);
+        setDownloadNotice('Failed to generate PDF. Please try using Export Options.');
+        setTimeout(() => setDownloadNotice(null), 3500);
+        setIsPdfGenerating(false);
+        return;
+      }
+      setIsPdfGenerating(false);
     } else if (format === 'json') {
       const jsonContent = JSON.stringify(
         {
-          reportClassification: 'TOP SECRET // NTRO-SIGINT-2026',
+          reportClassification: 'RESTRICTED // NTRO-ASTRAX-2026',
+          documentId: `NTRO-2026-A1-SIG-${activeSignal.crc32 || '7849B2'}`,
           timestamp: new Date().toISOString(),
           isComputed: activeSignal.isComputed || false,
           processingTimeMs: activeSignal.processingTimeMs || activeSignal.telemetry.inferenceComputeMs,
@@ -113,11 +124,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
 
           <button
             onClick={() => handleDownloadDirect('pdf')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-sm cursor-pointer"
-            title="Download formatted binary PDF"
+            disabled={isPdfGenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            title="Download formatted AstraX A4 PDF"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>PDF</span>
+            <span>{isPdfGenerating ? 'Generating...' : 'PDF'}</span>
           </button>
 
           <button

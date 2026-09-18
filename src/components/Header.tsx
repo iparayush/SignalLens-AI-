@@ -8,6 +8,7 @@ interface HeaderProps {
   onSelectSignal: (signal: SignalProfile) => void;
   onOpenExportModal: () => void;
   onNavigateLanding?: () => void;
+  onNavigateReports?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSignal,
   onOpenExportModal,
   onNavigateLanding,
+  onNavigateReports,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -128,19 +130,18 @@ export const Header: React.FC<HeaderProps> = ({
           
           <div className="h-6 w-px bg-[#1E293B]" />
 
-          {onNavigateLanding && (
-            <button
-              onClick={onNavigateLanding}
-              className="px-3 py-1.5 bg-[#101A32] hover:bg-[#1E293B] text-white border border-[#334155] rounded text-[11px] font-mono transition-colors"
-            >
-              Generate Report
-            </button>
-          )}
+          <button
+            id="generate-report-top-btn"
+            onClick={onNavigateReports || onOpenExportModal}
+            className="px-3 py-1.5 bg-[#101A32] hover:bg-[#1E293B] text-[#38bdf8] border border-[#38bdf8]/40 hover:border-[#38bdf8] rounded text-[11px] font-mono transition-all cursor-pointer"
+          >
+            Generate Report
+          </button>
 
           <button
             id="export-report-top-btn"
             onClick={onOpenExportModal}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#6D28D9] hover:bg-[#8B5CF6] text-white rounded font-mono text-[12px] font-bold tracking-wider transition-all shadow-[0_0_15px_rgba(139,92,246,0.4)]"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#6D28D9] hover:bg-[#8B5CF6] text-white rounded font-mono text-[12px] font-bold tracking-wider transition-all shadow-[0_0_15px_rgba(139,92,246,0.4)] cursor-pointer"
             type="button"
           >
             <Download className="w-3.5 h-3.5" />
