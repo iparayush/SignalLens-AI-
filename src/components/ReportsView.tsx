@@ -13,6 +13,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { generateSignalReportPdf, openPrintableReport } from '../lib/pdfGenerator';
+import { AstraXReportTemplate } from './AstraXReportTemplate';
 
 interface ReportsViewProps {
   activeSignal: SignalProfile;
@@ -21,6 +22,7 @@ interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenExportModal }) => {
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [reportViewMode, setReportViewMode] = useState<'astrax-template' | 'dossier'>('astrax-template');
 
   const handleDownloadDirect = (format: 'pdf' | 'json' | 'csv') => {
     const baseName = activeSignal.filename.replace(/\.[^/.]+$/, '');
@@ -84,8 +86,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
           </p>
         </div>
 
-        {/* Quick Export Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* View Mode Toggle: AstraX A4 Template vs Dossier */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-[#0a0e18] p-1 rounded-lg border border-[#313540] text-xs font-mono">
+            <button
+              onClick={() => setReportViewMode('astrax-template')}
+              className={`px-3 py-1 rounded transition-all ${
+                reportViewMode === 'astrax-template'
+                  ? 'bg-[#1677D2] text-white font-bold shadow-md'
+                  : 'text-[#869397] hover:text-[#dfe2f1]'
+              }`}
+            >
+              AstraX NTRO A4 Template
+            </button>
+            <button
+              onClick={() => setReportViewMode('dossier')}
+              className={`px-3 py-1 rounded transition-all ${
+                reportViewMode === 'dossier'
+                  ? 'bg-[#06b6d4] text-[#00424f] font-bold shadow-md'
+                  : 'text-[#869397] hover:text-[#dfe2f1]'
+              }`}
+            >
+              Tactical Dossier
+            </button>
+          </div>
+
           <button
             onClick={() => handleDownloadDirect('pdf')}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4cd7f6] hover:bg-[#acedff] text-[#003640] font-mono text-xs font-bold rounded uppercase tracking-wider transition-all shadow-sm cursor-pointer"
@@ -139,8 +164,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
         </div>
       )}
 
-      {/* Military Dossier Container */}
-      <div className="bg-[#171b26] p-6 rounded border border-[#262a35] flex flex-col gap-6 shadow-xl relative overflow-hidden">
+      {/* ─── AstraX NTRO A4 Template View ─── */}
+      {reportViewMode === 'astrax-template' && (
+        <AstraXReportTemplate activeSignal={activeSignal} initialMode="populated" />
+      )}
+
+      {/* ─── Military Dossier Container ─── */}
+      {reportViewMode === 'dossier' && (
+        <div className="bg-[#171b26] p-6 rounded border border-[#262a35] flex flex-col gap-6 shadow-xl relative overflow-hidden">
         {/* Classification Header Stamp */}
         <div className="flex flex-col items-center justify-center p-3 rounded bg-[#ffb4ab]/10 border border-[#ffb4ab]/30 text-[#ffb4ab] text-center font-mono">
           <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest">
@@ -264,6 +295,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ activeSignal, onOpenEx
           </div>
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 };

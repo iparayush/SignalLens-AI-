@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { SignalProfile } from '../types';
-import { Download, User, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Download, User, ChevronDown, CheckCircle2, Home } from 'lucide-react';
 
 interface HeaderProps {
   activeSignal: SignalProfile;
   signalsList: SignalProfile[];
   onSelectSignal: (signal: SignalProfile) => void;
   onOpenExportModal: () => void;
+  onNavigateLanding?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   signalsList,
   onSelectSignal,
   onOpenExportModal,
+  onNavigateLanding,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -25,6 +27,25 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="h-16 w-full px-4 flex items-center justify-between gap-4">
         {/* Active Telemetry Ribbon */}
         <div className="flex items-center gap-4 overflow-x-auto py-1 text-sm no-scrollbar">
+          {/* NTRO Header Stamp */}
+          <div className="flex items-center gap-2 pr-2 border-r border-[#313540] shrink-0">
+            <div className="flex items-center gap-[2px] h-5">
+              <span className="w-[2px] h-2 bg-[#4cd7f6] rounded-full" />
+              <span className="w-[2px] h-3.5 bg-[#4cd7f6] rounded-full" />
+              <span className="w-[2px] h-5 bg-[#4cd7f6] rounded-full" />
+              <span className="w-[2px] h-3.5 bg-[#4cd7f6] rounded-full" />
+              <span className="w-[2px] h-2 bg-[#4cd7f6] rounded-full" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-headline text-[11px] font-bold text-white leading-tight">
+                NTRO • AstraX
+              </span>
+              <span className="font-mono text-[8px] text-[#869397] uppercase tracking-wider">
+                Problem Statement 26147
+              </span>
+            </div>
+          </div>
+
           {/* Active File Switcher */}
           <div className="relative">
             <button
@@ -109,6 +130,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-3 shrink-0">
+          {onNavigateLanding && (
+            <button
+              onClick={onNavigateLanding}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171b26] hover:bg-[#262a35] text-[#4cd7f6] hover:text-[#acedff] rounded border border-[#313540] font-mono text-[11px] font-semibold tracking-wider transition-all cursor-pointer"
+              title="Return to Landing Page"
+              type="button"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Landing</span>
+            </button>
+          )}
+
           <button
             id="export-report-top-btn"
             onClick={onOpenExportModal}

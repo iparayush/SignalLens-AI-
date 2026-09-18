@@ -19,6 +19,7 @@ import { CorrelationView } from './components/CorrelationView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { ExportReportModal } from './components/ExportReportModal';
+import { LandingPage } from './components/LandingPage';
 
 // ─── Map pipeline results to SignalProfile for backward-compat UI ────────────
 
@@ -250,7 +251,7 @@ function mapPipelineToProfile(
 // ─── App Component ───────────────────────────────────────────────────────────
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('landing');
   const [signalsList, setSignalsList] = useState<SignalProfile[]>(SAMPLE_SIGNALS);
   const [activeSignal, setActiveSignal] = useState<SignalProfile>(SAMPLE_SIGNALS[0]);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -322,6 +323,20 @@ export default function App() {
     }
   }, []);
 
+  // When landing tab is active, render full-screen responsive Landing Page
+  if (activeTab === 'landing') {
+    return (
+      <LandingPage
+        activeSignal={activeSignal}
+        onLaunchApp={(tab) => {
+          setActiveTab(tab || 'upload-signal');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onFileUpload={handleFileUpload}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0e18] text-[#dfe2f1] font-body flex">
       {/* Fixed Left Tactical Navigation Sidebar */}
@@ -335,6 +350,10 @@ export default function App() {
           signalsList={signalsList}
           onSelectSignal={setActiveSignal}
           onOpenExportModal={() => setExportModalOpen(true)}
+          onNavigateLanding={() => {
+            setActiveTab('landing');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
 
         {/* Pipeline Processing Progress Bar */}
@@ -380,6 +399,7 @@ export default function App() {
               onSelectSignal={setActiveSignal}
               onFileUpload={handleFileUpload}
               onNavigateToDashboard={() => setActiveTab('dashboard')}
+              processingState={processingState}
             />
           )}
 

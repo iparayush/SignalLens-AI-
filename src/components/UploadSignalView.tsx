@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { SignalProfile } from '../types';
+import { SignalProfile, ProcessingState } from '../types';
 import { UploadCloud, CheckCircle2, HardDrive, Cpu, Radio, Sparkles, FileText, ArrowRight, Zap } from 'lucide-react';
 import { generateTestIQFile } from '../lib/dsp/signalGenerator';
+import { LiveTimeDomainScope } from './LiveTimeDomainScope';
 
 interface UploadSignalViewProps {
   activeSignal: SignalProfile;
@@ -9,6 +10,7 @@ interface UploadSignalViewProps {
   onSelectSignal: (signal: SignalProfile) => void;
   onFileUpload: (file: File) => void;
   onNavigateToDashboard: () => void;
+  processingState?: ProcessingState;
 }
 
 export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
@@ -17,6 +19,7 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
   onSelectSignal,
   onFileUpload,
   onNavigateToDashboard,
+  processingState = 'idle',
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<SignalProfile>(activeSignal);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -279,8 +282,25 @@ export const UploadSignalView: React.FC<UploadSignalViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Pre-Captured SIGINT Library */}
+        {/* Right Column: Live Time Domain Scope + Pre-Captured SIGINT Library */}
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-4">
+          {/* Live Animated Time Domain (I / Q) Scope */}
+          <LiveTimeDomainScope
+            processingState={statusMessage ? 'processing' : processingState}
+            rawIQ={activeSignal.rawIQ}
+            sampleRate={activeSignal.samplingRateMSps * 1e6}
+            modulation={activeSignal.telemetry.modulation}
+            snrDb={activeSignal.telemetry.estimatedSnrDb}
+            evmPct={activeSignal.evmRms}
+            title="Real-Time Time Domain Scope (I / Q Stream)"
+            subtitle={
+              statusMessage || processingState === 'processing'
+                ? 'Processing Signal... Live In-Phase & Quadrature continuous sweep'
+                : 'Continuous hardware sweep • Standby buffer awaiting stream'
+            }
+            height={210}
+          />
+
           <div className="bg-[#171b26] p-5 rounded border border-[#262a35] flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#dfe2f1] flex items-center gap-2">

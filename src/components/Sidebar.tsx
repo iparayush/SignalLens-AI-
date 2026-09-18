@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationTab } from '../types';
 import {
+  Home,
   LayoutDashboard,
   UploadCloud,
   Network,
@@ -19,6 +20,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: { id: NavigationTab; label: string; icon: React.ElementType }[] = [
+  { id: 'landing', label: 'Landing Page', icon: Home },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'upload-signal', label: 'Upload Signal', icon: UploadCloud },
   { id: 'signal-analysis', label: 'Signal Analysis', icon: Network },
@@ -42,7 +44,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     >
       <div className="flex flex-col">
         {/* Brand Header */}
-        <div className="p-4 flex flex-col gap-2 bg-[#0a0e18] border-b border-[#171b26]">
+        <div
+          onClick={() => onSelectTab('landing')}
+          className="p-4 flex flex-col gap-2 bg-[#0a0e18] border-b border-[#171b26] cursor-pointer hover:bg-[#131724] transition-colors"
+          title="Return to Landing Page"
+        >
           <div className="flex items-center gap-2.5">
             <div className="relative w-8 h-8 rounded bg-[#0f131d] flex items-center justify-center border border-[#313540] overflow-hidden shrink-0 shadow-[0_0_8px_rgba(76,215,246,0.2)]">
               <img

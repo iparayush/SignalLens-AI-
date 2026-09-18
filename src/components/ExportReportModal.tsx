@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { SignalProfile } from '../types';
-import { Download, X, FileText, Check, ShieldAlert, Printer } from 'lucide-react';
+import { Download, X, FileText, Check, ShieldAlert, Printer, Eye } from 'lucide-react';
 import { generateSignalReportPdf, openPrintableReport } from '../lib/pdfGenerator';
+import { AstraXReportTemplate } from './AstraXReportTemplate';
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -16,8 +17,26 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 }) => {
   const [format, setFormat] = useState<'pdf' | 'json' | 'txt' | 'csv'>('pdf');
   const [downloaded, setDownloaded] = useState(false);
+  const [showAstraXTemplate, setShowAstraXTemplate] = useState(false);
 
   if (!isOpen) return null;
+
+  if (showAstraXTemplate) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#050811]/95 backdrop-blur-md overflow-y-auto p-2 sm:p-4 flex flex-col items-center">
+        <div className="w-full max-w-[210mm] flex justify-end mb-2">
+          <button
+            onClick={() => setShowAstraXTemplate(false)}
+            className="px-3 py-1.5 bg-[#262a35] hover:bg-[#353944] text-white rounded font-mono text-xs flex items-center gap-1"
+          >
+            <X className="w-4 h-4" />
+            <span>Close Template Preview</span>
+          </button>
+        </div>
+        <AstraXReportTemplate activeSignal={activeSignal} onClose={() => setShowAstraXTemplate(false)} />
+      </div>
+    );
+  }
 
   const handleDownload = () => {
     const baseName = activeSignal.filename.replace(/\.[^/.]+$/, '');
@@ -209,14 +228,25 @@ End of Tactical Transmission Log • All Checksums Validated
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#313540]">
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#262a35] hover:bg-[#353944] text-[#4cd7f6] font-mono text-xs rounded uppercase font-semibold transition-colors cursor-pointer border border-[#313540]"
-            title="Open printable HTML report for printing or saving as PDF"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print / Save PDF (Browser)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAstraXTemplate(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1677D2] hover:bg-[#125ba3] text-white font-mono text-xs rounded uppercase font-bold transition-colors cursor-pointer shadow-md"
+              title="Preview official AstraX NTRO A4 technical report template"
+            >
+              <Eye className="w-4 h-4" />
+              <span>AstraX A4 Template</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#262a35] hover:bg-[#353944] text-[#4cd7f6] font-mono text-xs rounded uppercase font-semibold transition-colors cursor-pointer border border-[#313540]"
+              title="Open printable HTML report for printing or saving as PDF"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print Browser</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
             <button

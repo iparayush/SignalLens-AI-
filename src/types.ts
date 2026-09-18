@@ -8,6 +8,7 @@ import type { CorrelationResult } from './lib/dsp/correlator';
 import type { SignalMetrics } from './lib/dsp/signalMetrics';
 
 export type NavigationTab =
+  | 'landing'
   | 'dashboard'
   | 'upload-signal'
   | 'signal-analysis'

@@ -235,6 +235,7 @@ export function correlateStream(
       sidelobeLevel: 0,
       bestPsrDb: 0,
       estimatedFrameLengthBytes: null,
+      hasSignificantMatch: false,
       processingTimeMs: performance.now() - start,
     };
   }
