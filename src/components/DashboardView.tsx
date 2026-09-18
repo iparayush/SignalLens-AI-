@@ -38,7 +38,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <QuadrantVisualizer activeSignal={activeSignal} />
 
       {/* SECTION 4: SIGNAL PROCESSING PIPELINE (End-to-End Horizontal Architectural Flow) */}
-      <DSPPipelineFlow stages={activeSignal.pipelineStages} />
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3 font-mono text-[11px] font-bold text-[#14B8A6] uppercase tracking-widest px-1">
+          <span className="w-2 h-2 rounded-full bg-[#14B8A6] animate-pulse"></span>
+          SYSTEM ONLINE
+          <span className="text-[#64748B] mx-1">•</span>
+          DSP ENGINE ACTIVE
+          <span className="text-[#64748B] mx-1">•</span>
+          ALL STAGES SYNCHRONIZED
+        </div>
+        <DSPPipelineFlow stages={activeSignal.pipelineStages} />
+      </div>
 
       {/* LOWER DECK: SECTION 5 & 6 (RAW BITSTREAM CONSOLE & PREAMBLE CORRELATION ENGINE) */}
       <div className="grid grid-cols-12 gap-4">

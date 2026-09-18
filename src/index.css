@@ -1,39 +1,46 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #0f131d;
-  --color-surface-dim: #0f131d;
-  --color-surface-bright: #353944;
-  --color-surface-container-lowest: #0a0e18;
-  --color-surface-container-low: #171b26;
-  --color-surface-container: #1c1f2a;
-  --color-surface-container-high: #262a35;
-  --color-surface-container-highest: #313540;
-  --color-surface-variant: #313540;
-  --color-on-surface: #dfe2f1;
-  --color-on-surface-variant: #bcc9cd;
-  --color-outline: #869397;
-  --color-outline-variant: #3d494c;
-  --color-primary: #4cd7f6;
-  --color-on-primary: #003640;
-  --color-primary-container: #06b6d4;
-  --color-on-primary-container: #00424f;
-  --color-secondary: #adc6ff;
-  --color-on-secondary: #002e6a;
-  --color-secondary-container: #0566d9;
-  --color-on-secondary-container: #e6ecff;
-  --color-tertiary: #4edea3;
-  --color-on-tertiary: #003824;
-  --color-tertiary-container: #1bbd85;
-  --color-on-tertiary-container: #00452e;
-  --color-error: #ffb4ab;
-  --color-on-error: #690005;
-  --color-error-container: #93000a;
-  --color-on-error-container: #ffdad6;
-  --color-primary-fixed-dim: #4cd7f6;
+  --color-surface: #050816;
+  --color-surface-dim: #050816;
+  --color-surface-bright: #101A32;
+  --color-surface-container-lowest: #02050A;
+  --color-surface-container-low: #050816;
+  --color-surface-container: #0B1224;
+  --color-surface-container-high: #101A32;
+  --color-surface-container-highest: #1E293B;
+  --color-surface-variant: #1E293B;
+  
+  --color-on-surface: #F8FAFC;
+  --color-on-surface-variant: #94A3B8;
+  --color-outline: #334155;
+  --color-outline-variant: #1E293B;
+  
+  --color-primary: #22D3EE;
+  --color-on-primary: #000000;
+  --color-primary-container: #0891B2;
+  --color-on-primary-container: #CFFAFE;
+  
+  --color-secondary: #8B5CF6;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #6D28D9;
+  --color-on-secondary-container: #EDE9FE;
+  
+  --color-tertiary: #14B8A6;
+  --color-on-tertiary: #000000;
+  --color-tertiary-container: #0F766E;
+  --color-on-tertiary-container: #CCFBF1;
+  
+  --color-error: #EC4899;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #BE185D;
+  --color-on-error-container: #FCE7F3;
+  
+  --color-warning: #FBBF24;
+  --color-primary-fixed-dim: #22D3EE;
 
   --font-headline: "Space Grotesk", sans-serif;
-  --font-body: "Geist", sans-serif;
+  --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
@@ -59,19 +66,19 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0e18;
+  background: #02050A;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262a35;
+  background: #1E293B;
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4cd7f6;
+  background: #22D3EE;
 }
 
 /* Subtle tactical grid background pattern */
 .tactical-grid {
-  background-image: radial-gradient(rgba(76, 215, 246, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(34, 211, 238, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
@@ -85,18 +92,18 @@
 
 /* Glow utilities */
 .glow-cyan {
-  box-shadow: 0 0 35px -5px rgba(0, 242, 254, 0.35);
+  box-shadow: 0 0 35px -5px rgba(34, 211, 238, 0.35);
 }
 .glow-purple {
-  box-shadow: 0 0 35px -5px rgba(147, 51, 234, 0.35);
+  box-shadow: 0 0 35px -5px rgba(139, 92, 246, 0.35);
 }
 .text-gradient-cyan-purple {
-  background: linear-gradient(135deg, #00f2fe 0%, #38bdf8 40%, #c084fc 100%);
+  background: linear-gradient(135deg, #22D3EE 0%, #38bdf8 40%, #8B5CF6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 .text-gradient-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #8B5CF6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -106,11 +113,26 @@
 }
 
 @keyframes sweep {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* New animations for AstraX */
+.animate-waveform {
+  animation: waveform-scroll 2s linear infinite;
+}
+
+@keyframes waveform-scroll {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-waterfall {
+  animation: waterfall-scroll 10s linear infinite;
+}
+
+@keyframes waterfall-scroll {
+  from { background-position: 0 0; }
+  to { background-position: 0 100%; }
 }
 
