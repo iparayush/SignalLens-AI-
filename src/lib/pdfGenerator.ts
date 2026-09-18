@@ -18,7 +18,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { SignalProfile } from '../types';
 import { AstraXReportTemplate } from '../components/AstraXReportTemplate';
 
