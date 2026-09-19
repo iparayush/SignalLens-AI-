@@ -5,7 +5,7 @@
 <img src="https://img.shields.io/badge/Stack-TypeScript%20%7C%20React%20%7C%20DSP-cyan?style=for-the-badge" alt="Stack"/>
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
 
-# 📡 SignalLens AI  
+# SignalLens AI
 ### by Team **AstraX**
 
 ### Automated Signal Analysis & Parameter Extraction Platform
@@ -18,7 +18,7 @@
 
 </div>
 
-## 📋 Problem Statement
+## Problem Statement
 
 **PS 26147** — Design and implement an automated model for analysis of `.IQ` and `.WAV` signal files. The system should be capable of:
 
@@ -31,508 +31,270 @@
 
 ---
 
-## 🧠 About the Project
+## About the Project
 
-**SignalLens AI** is a browser-based signal analysis platform that helps engineers and researchers analyze IQ/WAV recordings and extract important signal parameters — without needing specialized RF hardware or software during the exploration phase.
+**SignalLens AI** is a browser-based signal analysis platform that helps engineers and researchers analyze IQ/WAV recordings and extract important signal parameters without needing specialized RF hardware or software during the exploration phase.
 
-It combines **classical Digital Signal Processing (DSP)** with **ML-based modulation classification** into a unified GUI workflow, producing structured analysis reports at the end.
+It combines **classical Digital Signal Processing (DSP)** with **ML-based modulation classification** into a unified GUI workflow, producing structured, official technical intelligence reports.
 
-> **Note:** This is a prototype developed for SIH 2026. Use only synthetic, public-domain, or duly-authorized signal recordings for development and testing.
+> **Note:** Developed for SIH 2026. Use only synthetic, public-domain, or duly-authorized signal recordings for development and testing.
 
 ---
 
-## 🎯 Key Features
+## Landing Page & Overview
+
+![SignalLens AI Landing Page](docs/images/landing.png)
+
+*The SignalLens AI landing page provides direct access to signal ingestion, live DSP telemetry previews, and technical capabilities.*
+
+---
+
+## Key Features
 
 | Feature | Description |
 |---|---|
-| 📁 **IQ / WAV Upload** | Drag-and-drop file upload with format validation |
-| 📈 **Waveform View** | Time-domain amplitude visualization |
-| 📊 **Spectrum / PSD** | FFT-based frequency and power spectral density analysis |
-| 🌊 **Waterfall / Spectrogram** | Time-frequency spectrogram with heatmap coloring |
-| 🎯 **Constellation View** | I/Q scatter plot for modulation visualization |
-| 🔬 **Parameter Detection** | Auto-extraction of center freq, bandwidth, SNR, power |
-| 🤖 **Modulation Classification** | ML-based classification (BPSK, QPSK, 8-PSK, FSK, QAM) |
-| 📡 **Demodulation** | FSK / PSK / QAM demodulation pipeline |
-| 🔀 **De-interleaving** | Symbol de-interleaving stage |
-| ✅ **FEC Decoding** | Forward error correction (Viterbi/Hamming) |
-| 🔗 **Bit-Stream Correlation** | Bit-stream cross-correlation analysis |
-| 📄 **Report Generation** | Downloadable PDF analysis report |
+| **IQ / WAV Upload** | Drag-and-drop file upload with header parsing, validation, and sample pre-fills |
+| **Waveform View** | Real-time time-domain amplitude visualization for I and Q channels |
+| **Spectrum / PSD** | High-resolution FFT frequency spectrum and Power Spectral Density analysis |
+| **Waterfall / Spectrogram** | Time-frequency spectrogram with thermal heatmap rendering |
+| **Constellation View** | Interactive I/Q scatter plot for symbol distribution and constellation clustering |
+| **Parameter Detection** | Automatic extraction of Center Frequency, Bandwidth, SNR, Symbol Rate, and Power |
+| **Modulation Classification** | ML-assisted classification across BPSK, QPSK, 8-PSK, 16-QAM, 64-QAM, and FSK |
+| **Demodulation Pipeline** | Synchronized demodulation for Phase-Shift Keying and Quadrature Amplitude modulations |
+| **De-interleaving** | Matrix-based symbol de-interleaving stage |
+| **FEC Decoding** | Forward error correction syndrome checks and bit recovery |
+| **Bit-Stream Correlation** | Pattern cross-correlation, preamble alignment, and Peak-to-Sidelobe ratio (PSR) extraction |
+| **A4 Technical Report** | Generation of official NTRO / AstraX A4 technical PDF intelligence reports |
 
 ---
 
-## 🖥️ Dashboard
+## Application Workspace & Signal Ingestion
 
-![SignalLens AI Dashboard — 4-quadrant view with waveform, spectrum, waterfall and constellation](docs/images/dashboard.jpg)
+![SignalLens AI Upload & Ingestion View](docs/images/upload.png)
 
-*The main dashboard shows Time Domain, Frequency Spectrum, Waterfall Spectrogram, and Constellation Diagram in a 4-quadrant layout.*
+*Signal ingestion interface featuring drag-and-drop .IQ and .WAV support, file integrity checks, format validation, and pre-loaded test profiles.*
 
 ---
 
-## ⚙️ How It Works
+## Dashboard & DSP Visualizer
 
-The signal processing pipeline follows these stages:
+![SignalLens AI Dashboard](docs/images/dashboard.png)
+
+*The 4-quadrant DSP workspace displays Time Domain, Frequency Spectrum (FFT), Waterfall Spectrogram, and Constellation Diagram in real time.*
+
+---
+
+## How It Works
+
+The automated signal processing pipeline follows structured stages:
 
 ```
-📂 Upload IQ/WAV File
+Upload IQ/WAV File
         │
         ▼
-🛡️  File Validation & Parsing
+File Validation & Header Parsing
         │
         ▼
-⚙️  Preprocessing & Conditioning
+Preprocessing & Sample Conditioning
         │
         ▼
-📊  Signal Analysis Engine (FFT, PSD, Spectrogram)
+Signal Analysis Engine (FFT, PSD, Spectrogram)
         │
         ▼
-🔍  Parameter Detection (Freq, BW, SNR, Power)
+Parameter Detection (Center Freq, Bandwidth, SNR, Power)
         │
         ▼
-🤖  Modulation Classification (ML)
+Modulation Classification (ML Classifier)
         │
         ▼
-📡  Demodulation (FSK / PSK / QAM)
+Demodulation Pipeline (FSK / PSK / QAM)
         │
         ▼
-🔀  De-interleaving
+Symbol De-interleaving
         │
         ▼
-✅  FEC Decoding
+FEC Decoding & Error Correction
         │
         ▼
-🔗  Bit-Stream Analysis & Correlation
+Bit-Stream Cross-Correlation & Alignment
         │
         ▼
-📄  Report Generation
+A4 Intelligence Report Generation (PDF/DOCX)
 ```
-
-### Workflow Diagram
-
-![Illustrative signal processing workflow from file upload through to report generation](docs/diagrams/workflow.jpg)
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
-![System architecture showing GUI layer, signal processing core, ML engine, and data sources](docs/diagrams/architecture.jpg)
+The architecture is structured into four distinct modular layers:
 
-The system is organized into four layers:
+```
++-------------------------------------------------------------------------+
+|                        SignalLens AI Platform                           |
++-------------------------------------------------------------------------+
+| UI & Visualization Layer                                                |
+|   - React 19 + TypeScript + Vite                                        |
+|   - HTML5 Canvas DSP Accelerators (Time, FFT, Constellation, Waterfall) |
+|   - AstraX Mission Dossier & A4 Report Engine                           |
++-------------------------------------------------------------------------+
+| Signal Processing & DSP Engine                                          |
+|   - Cooley-Tukey Radix-2 FFT & Windowing (Blackman, Hanning, Hamming)    |
+|   - Power Spectral Density (PSD) & 3dB/Occupied Bandwidth Estimator     |
+|   - SNR Estimation (M2M4, Spectral Noise Floor Separation)              |
+|   - Costas Loop Carrier Recovery & Gardner Symbol Synchronizer          |
++-------------------------------------------------------------------------+
+| Post-Demodulation & Decode Pipeline                                     |
+|   - Hard / Soft Symbol Slicing & Demapping                              |
+|   - Convolutional De-interleaver                                        |
+|   - FEC Syndrome Checking & Viterbi Decoding                            |
+|   - Sliding Cross-Correlation & Peak-to-Sidelobe Ratio (PSR) Engine     |
++-------------------------------------------------------------------------+
+| Export & Verification Layer                                             |
+|   - AstraX NTRO Master A4 PDF Generator (html2canvas-pro + jsPDF)       |
+|   - Raw Hex/ASCII Bitstream Formatter & CSV Telemetry Serializer        |
++-------------------------------------------------------------------------+
+```
 
 | Layer | Components |
 |---|---|
-| **UI Layer** | File Upload, Visualization Engine, Report Generator |
-| **Processing Core** | Time Domain, Frequency Domain, Parameter Extraction, Modulation Detection, Demodulation, FEC |
-| **Post-processing** | De-interleaver, Bit-Stream Correlator |
-| **ML Engine** | Modulation Classifier (PyTorch / scikit-learn) |
+| **UI & Visualization** | Ingestion module, 4-quadrant canvas engine, theme styling, report previewer |
+| **DSP Core** | Time domain conditioning, FFT computation, Welch PSD, noise floor estimation, bandwidth extraction |
+| **Demod & Decoding** | Constellation demapper, symbol synchronizer, matrix de-interleaver, FEC decoder |
+| **Report Generation** | Official NTRO A4 document builder, embedded chart rasterizers, PDF export |
 
 ---
 
-## 🔧 DSP Pipeline
+## Visualizations Explained
 
-![Horizontal DSP pipeline showing data transformation from raw IQ samples to final report](docs/diagrams/pipeline.jpg)
-
-The processing pipeline transforms data through these stages:
-
-```
-Raw Samples → Cleaned Samples → Frequency Data → Parameters → Modulation Type → Decoded Bits → Report
-```
-
----
-
-## 📊 Visualizations
-
-### Waveform & Frequency Spectrum
-
-![Time domain waveform and power spectral density side by side](docs/images/waveform_spectrum.jpg)
-
-> ⚠️ **Illustrative — Not real measurement data.** Charts shown are for demonstration purposes only.
-
-| Chart | What it Shows |
+| Chart | Tactical Function |
 |---|---|
-| **Time Domain** | Signal amplitude over time, reveals waveform shape |
-| **Frequency Spectrum / PSD** | Power distribution over frequency, reveals center frequency and bandwidth |
+| **Time Domain** | Displays instantaneous in-phase (I) and quadrature (Q) amplitudes over time, revealing envelope and pulse shape |
+| **Frequency Spectrum (FFT / PSD)** | Visualizes spectral energy distribution, identifying center frequency, sidelobes, and 3dB occupied bandwidth |
+| **Waterfall Spectrogram** | Time-frequency thermal map showing spectral shifts, signal bursts, frequency hops, and carrier stability |
+| **Constellation Diagram** | I/Q polar phase plane mapping symbol clusters, phase noise, EVM degradation, and modulation geometry |
 
 ---
 
-### Waterfall & Constellation
+## Report Generation & Export
 
-![Waterfall spectrogram and QPSK constellation diagram side by side](docs/images/waterfall_constellation.jpg)
+![SignalLens AI Export Modal](docs/images/export_modal.png)
 
-> ⚠️ **Illustrative — Not real measurement data.**
+*Export modal supporting multi-format export including official PDF reports, raw text dossiers, and telemetry files.*
 
-| Chart | What it Shows |
+![AstraX Official A4 Technical Report](docs/images/report.png)
+
+*Official NTRO / AstraX A4 technical signal analysis report with embedded 300 DPI DSP charts, 10 tactical sections, and decoded bitstream samples.*
+
+The generated report contains:
+- Official NTRO & AstraX header with document ID, date, and security classification
+- Primary file metadata (filename, format, file size, duration, sampling rate Fs, center frequency Fc)
+- Tactical target designation, emitter classification, callsign, and coordinates
+- Automated RF parameter extraction (SNR, occupied bandwidth, symbol rate, modulation scheme)
+- Embedded high-resolution DSP raster charts (Time Domain, FFT Spectrum, Constellation, Waterfall)
+- Synchronization and correlation metrics (PSR, frame offset, preamble hex)
+- Forward error correction (FEC) and interleaving parameters
+- Recovered bitstream sample in structured Hex/ASCII format
+- Key intelligence findings and technical summary
+
+---
+
+## Technology Stack
+
+```
++-------------------------------------------------------------+
+|                    SignalLens AI Stack                      |
++-----------------------+-------------------------------------+
+| Frontend Platform     | React 19, TypeScript, Vite          |
+| Styling & Theme       | Vanilla CSS & Modern Layouts        |
+| DSP Visualizations    | HTML5 Canvas Hardware Accelerated   |
+| PDF Report Engine     | jsPDF, html2canvas-pro              |
+| Vector Icons          | Lucide React                        |
+| Deployment            | Vercel Cloud Platform               |
++-----------------------+-------------------------------------+
+```
+
+| Technology | Purpose |
 |---|---|
-| **Waterfall Plot** | How signal frequency changes over time (good for spotting frequency-hopping or drift) |
-| **Constellation Diagram** | I/Q symbol scatter — reveals modulation type from cluster pattern |
+| **TypeScript** | Strict type safety for complex signal telemetry, arrays, and DSP models |
+| **React 19** | Componentized UI architecture and responsive state management |
+| **Vite** | Sub-second HMR development and optimized production bundling |
+| **HTML5 Canvas** | High-performance 60 FPS real-time waveform, FFT, and spectrogram rendering |
+| **html2canvas-pro** | High-fidelity DOM-to-canvas rendering supporting modern CSS color gamuts (OKLCH) |
+| **jsPDF** | A4 document generation adhering to strict NTRO print dimensions |
+| **Lucide React** | Clean, technical iconography throughout the analysis dashboard |
 
 ---
 
-### Analysis Report
+## Core DSP Algorithms
 
-![Sample analysis report showing file info, signal parameters, modulation classification, and demodulation results](docs/images/report.jpg)
+### FFT & Spectral Analysis
 
-The generated report includes:
-- File metadata
-- Detected signal parameters
-- Modulation classification with confidence
-- Demodulation results
-- FEC decoding status
-
----
-
-## 🛠️ Technology Stack
-
-### System Architecture Technologies
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    SignalLens AI System                     │
-├──────────────────────┬──────────────────────────────────────┤
-│   GUI Layer          │   PyQt / PySide6                     │
-│   Visualization      │   Matplotlib / PyQtGraph             │
-├──────────────────────┼──────────────────────────────────────┤
-│   Signal Processing  │   Python + NumPy / SciPy             │
-│   DSP Pipeline       │   GNU Radio                          │
-├──────────────────────┼──────────────────────────────────────┤
-│   AI / ML Engine     │   PyTorch / scikit-learn             │
-├──────────────────────┼──────────────────────────────────────┤
-│   High-Perf Core     │   C++ (libsigmf, custom DSP)        │
-└──────────────────────┴──────────────────────────────────────┘
-```
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| 🐍 **Signal Processing** | Python + NumPy / SciPy | FFT, PSD, filtering, correlation, FEC |
-| 📡 **DSP Pipeline** | GNU Radio | Flowgraph-based signal routing and demodulation |
-| 🤖 **AI Classification** | PyTorch | Deep learning-based modulation classifier |
-| 📊 **ML Utilities** | scikit-learn | Feature extraction, preprocessing, evaluation |
-| 🖥️ **GUI** | PyQt / PySide6 | Cross-platform desktop GUI |
-| 📈 **Visualization** | Matplotlib / PyQtGraph | Waveform, spectrum, waterfall, constellation plots |
-| ⚡ **High-Performance** | C++ | Real-time signal processing hot paths |
-
----
-
-### 🐍 Python + NumPy / SciPy — Signal Processing & DSP
-
-The core signal processing engine is built on Python's scientific stack:
-
-```python
-# Signal parameter extraction using NumPy/SciPy
-import numpy as np
-from scipy import signal, fft
-
-# FFT-based spectrum analysis
-frequencies = fft.fftfreq(N, d=1/sample_rate)
-spectrum    = np.abs(fft.fft(iq_samples)) ** 2
-
-# Welch PSD estimation
-freq, psd = signal.welch(iq_samples, fs=sample_rate, nperseg=1024)
-
-# Bandwidth estimation from PSD
-center_freq = frequencies[np.argmax(spectrum)]
-bandwidth   = estimate_3db_bandwidth(freq, psd)
-```
-
-**Modules:**
-
-| Module | Responsibility |
-|---|---|
-| `numpy` | Array operations, FFT, math |
-| `scipy.signal` | Filtering, PSD (Welch), correlation |
-| `scipy.fft` | Fast Fourier Transform |
-| `scipy.special` | Error functions, FEC helpers |
-
----
-
-### 📡 GNU Radio — Signal Processing Pipeline
-
-GNU Radio provides the flowgraph-based pipeline for real-time and file-based signal processing:
-
-```
-┌─────────────┐    ┌──────────────┐    ┌────────────────┐
-│ File Source  │───►│  Low-Pass    │───►│  Demodulator   │
-│ (.iq / .wav) │    │  Filter      │    │  (FM/AM/PSK)   │
-└─────────────┘    └──────────────┘    └────────────────┘
-                                                │
-                          ┌─────────────────────▼──────────────────┐
-                          │  Sink: File / GUI / Python Callback     │
-                          └────────────────────────────────────────┘
-```
-
-**Key GNU Radio Blocks Used:**
-
-| Block | Purpose |
-|---|---|
-| `blocks.file_source` | Read IQ/WAV from disk |
-| `filter.low_pass_filter` | Anti-aliasing / channel filter |
-| `analog.fm_demod_cf` | FM demodulation |
-| `digital.psk_demod` | PSK demodulation |
-| `digital.constellation_decoder_cb` | QAM/PSK symbol decisions |
-| `fft.logpwrfft_c` | Real-time FFT for spectrum display |
-
----
-
-### 🤖 PyTorch / scikit-learn — AI-Based Classification
-
-The modulation classifier uses a CNN trained on spectrogram images:
-
-```python
-import torch
-import torch.nn as nn
-
-class ModulationClassifier(nn.Module):
-    """
-    CNN-based modulation classifier.
-    Input:  Spectrogram image  (1 × 128 × 128)
-    Output: Modulation probabilities (N classes)
-    """
-    def __init__(self, num_classes=8):
-        super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((4, 4)),
-        )
-        self.classifier = nn.Sequential(
-            nn.Linear(128 * 4 * 4, 256),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(256, num_classes),
-        )
-
-    def forward(self, x):
-        x = self.features(x)
-        x = x.view(x.size(0), -1)
-        return self.classifier(x)
-
-# Supported modulation types
-MODULATIONS = ["BPSK", "QPSK", "8-PSK", "16-QAM",
-               "64-QAM", "FSK-2", "FSK-4", "AM-DSB"]
-```
-
-**scikit-learn** is used for feature-based classification and preprocessing:
-
-```python
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-
-# Feature vector: [SNR, bandwidth, spectral_kurtosis,
-#                  cyclostationary_features, AM_index...]
-classifier = RandomForestClassifier(n_estimators=100)
-```
-
----
-
-### 🖥️ PyQt / PySide6 — GUI Development
-
-The desktop GUI is built with PySide6 (Qt6):
-
-```python
-from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout,
-    QHBoxLayout, QSplitter, QTabWidget
-)
-from PySide6.QtCore import Qt, QThread, Signal
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("SignalLens AI — PS 26147")
-        self._setup_ui()
-
-    def _setup_ui(self):
-        # 4-quadrant visualizer layout
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.waveform_panel)
-        splitter.addWidget(self.spectrum_panel)
-        # ...
-```
-
----
-
-### 📈 Matplotlib / PyQtGraph — Signal Visualization
-
-**PyQtGraph** handles real-time plots (low-latency GPU-accelerated):
-
-```python
-import pyqtgraph as pg
-
-# Waterfall spectrogram — real-time update
-self.waterfall = pg.ImageItem()
-self.waterfall.setColorMap(pg.colormap.get('CET-L9'))
-
-# Constellation diagram
-self.scatter = pg.ScatterPlotItem(size=3, pen=None,
-                                   brush=pg.mkBrush(0, 200, 255, 180))
-```
-
-**Matplotlib** is used for static report charts:
-
-```python
-import matplotlib.pyplot as plt
-
-fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-axes[0,0].plot(time, amplitude, color='#00e5ff')
-axes[0,1].semilogy(freq, psd,   color='#c8f400')
-axes[1,0].imshow(spectrogram, aspect='auto', cmap='jet')
-axes[1,1].scatter(I, Q, s=1, alpha=0.3, color='cyan')
-```
-
----
-
-### ⚡ C++ — High-Performance Processing
-
-Performance-critical DSP routines are implemented in C++ and exposed to Python via `pybind11`:
-
-```cpp
-// fft_engine.cpp — FFTW3-based high-performance FFT
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
-#include <fftw3.h>
-
-namespace py = pybind11;
-
-py::array_t<double> compute_psd(py::array_t<std::complex<double>> samples,
-                                  int nfft, double sample_rate) {
-    // FFTW3 plan for maximum performance
-    fftw_complex *in  = fftw_alloc_complex(nfft);
-    fftw_complex *out = fftw_alloc_complex(nfft);
-    fftw_plan plan = fftw_plan_dft_1d(nfft, in, out,
-                                       FFTW_FORWARD, FFTW_ESTIMATE);
-    // ... compute PSD ...
-    fftw_destroy_plan(plan);
-    return result;
-}
-
-PYBIND11_MODULE(signal_engine, m) {
-    m.def("compute_psd", &compute_psd, "FFTW3-based PSD computation");
+```typescript
+// Fast Fourier Transform & Power Spectral Density Computation
+export function computeFFT(samplesI: Float32Array, samplesQ: Float32Array, nfft: number) {
+  const spectrum = new Float32Array(nfft);
+  // Apply Blackman-Harris windowing to suppress spectral leakage
+  for (let i = 0; i < nfft; i++) {
+    const window = 0.35875 - 0.48829 * Math.cos((2 * Math.PI * i) / (nfft - 1))
+                          + 0.14128 * Math.cos((4 * Math.PI * i) / (nfft - 1))
+                          - 0.01168 * Math.cos((6 * Math.PI * i) / (nfft - 1));
+    // Windowed sample transformation ...
+  }
+  return spectrum;
 }
 ```
 
-**C++ Components:**
+### Parameter Extraction Modules
 
-| Component | Library | Purpose |
-|---|---|---|
-| FFT Engine | FFTW3 | Ultra-fast FFT computation |
-| FEC Decoder | libcorrect | Viterbi / Reed-Solomon decoding |
-| Correlator | Custom SIMD | Cross-correlation with AVX2 intrinsics |
-| File Parser | libsigmf | IQ file format parsing |
-
----
-
-### Core DSP Modules
-
-```
-src/
-├── dsp/
-│   ├── fft.py              # FFT wrapper (NumPy + C++ backend)
-│   ├── spectrogram.py      # Short-time FFT spectrogram
-│   ├── signal_metrics.py   # SNR, power, bandwidth extraction
-│   ├── signal_generator.py # Synthetic signal generation
-│   ├── demodulator.py      # FSK / PSK / QAM demodulation
-│   ├── deinterleaver.py    # Symbol de-interleaving
-│   ├── fec.py              # Forward error correction
-│   └── correlator.py       # Cross-correlation analysis
-│
-├── ml/
-│   ├── modulation_classifier.py  # PyTorch CNN classifier
-│   ├── feature_extractor.py      # Statistical feature extraction
-│   └── models/                   # Pre-trained model weights
-│
-├── gui/
-│   ├── main_window.py            # PySide6 main window
-│   ├── waveform_panel.py         # Time domain widget
-│   ├── spectrum_panel.py         # Frequency spectrum widget
-│   ├── waterfall_panel.py        # Spectrogram widget
-│   └── constellation_panel.py    # I/Q scatter widget
-│
-├── cpp/
-│   ├── fft_engine.cpp            # FFTW3 high-perf FFT
-│   ├── correlator.cpp            # SIMD correlator
-│   ├── fec_decoder.cpp           # Viterbi decoder
-│   └── CMakeLists.txt
-│
-└── pipeline.py                   # GNU Radio flowgraph
-```
+| Module | Technical Function |
+|---|---|
+| `fft.ts` | Cooley-Tukey Radix-2 FFT with customizable window functions |
+| `spectrogram.ts` | Overlapping STFT engine generating time-frequency energy matrices |
+| `signalMetrics.ts` | Automatic estimation of SNR (M2M4), peak power, center frequency, and bandwidth |
+| `demodulator.ts` | Costas loop carrier tracking, Gardner timing recovery, and symbol slicing |
+| `fec.ts` | Forward error correction syndromes, Hamming parity, and bit error estimation |
+| `correlator.ts` | Time-domain cross-correlation for sync pattern detection and PSR calculation |
+| `chartRenderer.ts` | Serverless offscreen canvas rasterizer for 300 DPI PDF report embedding |
 
 ---
 
-## 🔬 Research Focus
-
-```
-DSP (FFT, PSD, Spectrogram)
-        ↓
-Parameter Detection (Freq, BW, SNR)
-        ↓
-Modulation Classification (ML)
-        ↓
-Demodulation (FSK / PSK / QAM)
-        ↓
-FEC Decoding (Viterbi / Hamming)
-        ↓
-Bit-Stream Correlation
-```
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 SignalLens-AI/
-│
 ├── README.md
-│
 ├── docs/
-│   ├── images/
-│   │   ├── dashboard.jpg             # Main dashboard UI
-│   │   ├── waveform_spectrum.jpg     # Time domain + PSD charts
-│   │   ├── waterfall_constellation.jpg # Waterfall + Constellation
-│   │   └── report.jpg                # Sample analysis report
-│   │
-│   └── diagrams/
-│       ├── workflow.jpg              # Step-by-step workflow
-│       ├── architecture.jpg          # System architecture
-│       └── pipeline.jpg              # DSP processing pipeline
+│   └── images/
+│       ├── landing.png               # Landing page screenshot
+│       ├── upload.png                # Ingestion view screenshot
+│       ├── dashboard.png             # 4-quadrant DSP dashboard screenshot
+│       ├── export_modal.png          # Export modal screenshot
+│       └── report.png                # Official A4 technical report screenshot
 │
 ├── src/
 │   ├── components/
-│   │   ├── UploadSignalView.tsx
-│   │   ├── SignalAnalysisView.tsx
-│   │   ├── DemodulationView.tsx
-│   │   ├── CorrelationView.tsx
-│   │   ├── DecodePipelineView.tsx
-│   │   ├── QuadrantVisualizer.tsx
-│   │   ├── ReportsView.tsx
-│   │   └── ExportReportModal.tsx
+│   │   ├── LandingPage.tsx           # Full-screen responsive landing page
+│   │   ├── Header.tsx                # Tactical NTRO/AstraX top bar
+│   │   ├── Sidebar.tsx               # Navigation sidebar
+│   │   ├── UploadSignalView.tsx      # Signal ingestion & validation
+│   │   ├── SignalAnalysisView.tsx    # Detailed DSP analysis view
+│   │   ├── QuadrantVisualizer.tsx    # 4-quadrant canvas visualizer
+│   │   ├── DemodulationView.tsx      # Demodulation & constellation inspection
+│   │   ├── CorrelationView.tsx       # Sync & pattern correlation
+│   │   ├── DecodePipelineView.tsx    # De-interleave & FEC decoding
+│   │   ├── ReportsView.tsx           # Report viewer
+│   │   ├── AstraXReportTemplate.tsx  # Master A4 printable report template
+│   │   └── ExportReportModal.tsx     # PDF/Text export dialog
 │   │
 │   ├── lib/
-│   │   ├── dsp/
-│   │   │   ├── fft.ts
-│   │   │   ├── spectrogram.ts
-│   │   │   ├── signalMetrics.ts
-│   │   │   ├── signalGenerator.ts
-│   │   │   ├── demodulator.ts
-│   │   │   ├── deinterleaver.ts
-│   │   │   ├── fec.ts
-│   │   │   └── correlator.ts
-│   │   │
-│   │   ├── ml/
-│   │   │   └── modulationClassifier.ts
-│   │   │
-│   │   ├── fileParser.ts
-│   │   ├── pdfGenerator.ts
-│   │   └── pipeline.ts
+│   │   ├── dsp/                      # DSP algorithms (FFT, SNR, Demod, FEC)
+│   │   ├── chartRenderer.ts          # Offscreen canvas chart rasterizer
+│   │   ├── pdfGenerator.ts           # A4 PDF report generator
+│   │   └── sampleSignals.ts          # Pre-loaded tactical signals
 │   │
-│   ├── types.ts
-│   └── App.tsx
+│   ├── types.ts                      # Telemetry & signal profile definitions
+│   └── App.tsx                       # Main application shell
 │
-├── examples/                         # Sample signal files (coming soon)
 ├── package.json
 ├── vite.config.ts
 └── tsconfig.json
@@ -540,11 +302,11 @@ SignalLens-AI/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18 or higher
 - npm or yarn
 
 ### Installation
@@ -557,13 +319,13 @@ cd SignalLens-AI-
 # Install dependencies
 npm install
 
-# Start development server
+# Start local development server
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`
+The application will be accessible at `http://localhost:3000`.
 
-### Build for Production
+### Production Build
 
 ```bash
 npm run build
@@ -571,52 +333,36 @@ npm run build
 
 ---
 
-## 🌟 Advantages
+## Advantages
 
-- ✅ **Reduces manual effort** — Automates the entire signal analysis workflow end-to-end
-- ✅ **Unified platform** — From file upload to report generation in one tool
-- ✅ **AI + DSP** — Combines classical signal processing with ML-based classification
-- ✅ **Multi-stage pipeline** — Covers demodulation, de-interleaving, FEC, and correlation
-- ✅ **Confidence-based output** — ML classifier provides probability scores per modulation type
-- ✅ **Reproducible reports** — Generates structured PDF reports for documentation
-- ✅ **Browser-based** — No local installation of SDR tools required for initial analysis
+- **Automated Workflow** — Eliminates manual tuning by automating parameter extraction from raw IQ/WAV captures.
+- **Hardware-Free Ingestion** — Enables rapid exploratory analysis directly in modern browsers without local SDR hardware setups.
+- **Comprehensive DSP Stack** — Integrates Time Domain, FFT, Spectrogram, Constellation, Demodulation, and FEC in one workspace.
+- **High-Fidelity Reporting** — Outputs publication-ready A4 technical intelligence reports with embedded high-resolution charts.
+- **Cross-Platform Compatibility** — Runs seamlessly across any modern operating system via web standards.
 
 ---
 
-## 🔮 Future Scope
+## Safety & Data Policy
 
-| Area | Planned Work |
-|---|---|
-| **Modulation Types** | Add AM, FM, OFDM, LoRa, Bluetooth modulation support |
-| **FEC Schemes** | Turbo codes, LDPC, Reed-Solomon |
-| **ML Models** | Deep learning classifiers (CNN on spectrogram images) |
-| **Batch Processing** | Multi-file batch analysis mode |
-| **Parameter Estimation** | Improved automated channel estimation |
-| **Export Formats** | JSON, CSV, and XML export alongside PDF |
-| **Hardware Integration** | Direct SDR hardware streaming support |
-
----
-
-## ⚠️ Safety & Data Policy
-
-> Use **only synthetic, public-domain, or duly-authorized** signal recordings for development and testing.
+> Use **only synthetic, public-domain, or duly-authorized** signal recordings for development, evaluation, and demonstration.
 >
-> Do **not** capture, analyze, or process signals from licensed radio communications without appropriate authorization. The tool is intended for use with test signals and authorized data only.
+> Do not capture, analyze, or process signals from licensed radio communications without appropriate official authorization. The tool is intended exclusively for authorized research, educational, and defense innovation purposes.
 
 ---
 
-## 👥 Team
+## Team
 
-| | |
+| Role | Details |
 |---|---|
-| **Team Name** | 🚀 AstraX |
+| **Team Name** | AstraX |
 | **Project** | SignalLens AI |
 | **Event** | Smart India Hackathon 2026 |
 | **Problem Statement** | PS 26147 |
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
@@ -624,7 +370,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-Made with ❤️ by **Team AstraX** for **Smart India Hackathon 2026**
+Developed by **Team AstraX** for **Smart India Hackathon 2026**
 
 **PS 26147 — Automated Signal Analysis & Parameter Extraction**
 
